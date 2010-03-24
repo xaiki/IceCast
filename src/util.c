@@ -84,51 +84,125 @@ int util_timed_wait_for_fd(sock_t fd, int timeout)
 #endif
 }
 
-int util_read_header(sock_t sock, char *buff, unsigned long len, int entire)
+int util_find_eos_delim(refbuf_t *refbuf, int offset, int flags)
 {
-    int read_bytes, ret;
-    unsigned long pos;
-    char c;
+    int len = refbuf->len;
+
+    if (offset < 0) {
+        len = -offset;
+        offset = 0;
+    }
+
+    /* handle \n, \r\n and nsvcap which for some strange reason has
+     * EOL as \r\r\n */
+    char *ptr;
+    switch (flags) {
+    case HEADER_READ_LINE:
+        /* password line */
+	    ptr = memmem (refbuf->data + offset, len - offset, "\r\r\n", 3);
+        if (ptr)
+            return ((ptr+3) - refbuf->data + offset);
+        ptr = memmem (refbuf->data + offset, len - offset, "\r\n", 2);
+        if (ptr)
+            return ((ptr+2) - refbuf->data + offset);
+        ptr = memmem (refbuf->data + offset, len - offset, "\n", 1);
+        if (ptr)
+            return ((ptr+1) - refbuf->data + offset);
+        break;
+    case HEADER_READ_ENTIRE:
+        /* stream_offset refers to the start of any data sent after the
+         * http style headers, we don't want to lose those */
+        ptr = memmem (refbuf->data + offset, len - offset, "\r\r\n\r\r\n", 6);
+        if (ptr)
+            return ((ptr+6) - refbuf->data + offset);
+
+        ptr = memmem (refbuf->data + offset, len - offset, "\r\n\r\n", 4);
+        if (ptr)
+            return ((ptr+4) - refbuf->data + offset);
+
+        ptr = memmem (refbuf->data + offset, len - offset, "\n\n", 2);
+        if (ptr)
+            return ((ptr+2) - refbuf->data + offset);
+        break;
+    default:
+        WARN ("Unhandled flag: %d", flags);
+    }
+
+    return -ENOENT;
+}
+
+int util_read_header(connection_t *con, refbuf_t *refbuf, int flags)
+{
+	int bytes, pos, endpos = -ENOENT;
     ice_config_t *config;
     int header_timeout;
 
-    config = config_get_config();
-    header_timeout = config->header_timeout;
-    config_release_config();
-
-    read_bytes = 1;
-    pos = 0;
-    ret = 0;
-
-    while ((read_bytes == 1) && (pos < (len - 1))) {
-        read_bytes = 0;
-
-        if (util_timed_wait_for_fd(sock, header_timeout*1000) > 0) {
-
-            if ((read_bytes = recv(sock, &c, 1, 0))) {
-                if (c != '\r') buff[pos++] = c;
-                if (entire) {
-                    if ((pos > 1) && (buff[pos - 1] == '\n' &&
-                                      buff[pos - 2] == '\n')) {
-                        ret = 1;
-                        break;
-                    }
-                }
-                else {
-                    if ((pos > 1) && (buff[pos - 1] == '\n')) {
-                        ret = 1;
-                        break;
-                    }
-                }
-            }
-        } else {
-            break;
-        }
+    if (!refbuf) {
+        WARN ("No refbuf !");
+        return -ENOENT;
     }
 
-    if (ret) buff[pos] = '\0';
+    config = config_get_config();
+    header_timeout = config->header_timeout*1000;
+    config_release_config();
 
-    return ret;
+    if (util_timed_wait_for_fd(con->sock, header_timeout) <= 0) {
+	    INFO("util_timed_wait_for_fd <= 0");
+	    return -EAGAIN;
+    }
+
+    if (refbuf->sync_point < 0) {
+        DEBUG ("REENTRING, got and old non-resolved sync");
+        pos = -refbuf->sync_point;
+    } else if (refbuf->sync_point > 0) {
+        DEBUG ("REENTRING, got and old resolved sync");
+        endpos = pos = refbuf->sync_point;
+    } else {
+        DEBUG ("FIRST TIME, no sync");
+        pos = 0;
+    }
+
+    while ((bytes = sock_read_bytes (con->sock, refbuf->data + pos, refbuf->len - pos)) >= 0) {
+        if (bytes == 0)
+            con->error = 1;
+        if (bytes == -1 && !sock_recoverable (sock_error()))
+            con->error = 1;
+
+        DEBUG("read %d, %d '%s'\nfrom pos '%s'", bytes, endpos, refbuf->data, refbuf->data + pos);
+	/* this is used for re-entrance, so we get a new chance to read */
+        if (endpos == -ENOENT)
+            endpos = util_find_eos_delim (refbuf, -(bytes + pos), flags);
+        if (endpos != -ENOENT) {
+            INFO("found it, read %d, left for you: %d, starting %s",
+                 pos + bytes, pos + bytes - endpos, refbuf->data);
+            if (pos + bytes - endpos > 0) {
+                refbuf->len = pos + bytes;
+                INFO("ok got everything");
+                refbuf->sync_point = 0;
+                return endpos;
+            }
+            INFO ("missing client data, come back for more");
+            refbuf->sync_point = endpos;
+            return endpos;
+        }
+
+        pos += bytes;
+
+        if (refbuf->len - pos <= 0) {
+            WARN ("Looked for endpos up to %d, but couldn't find it,… well data is %s", pos, refbuf->data);
+            return -ENOMEM;
+        }
+
+	    if (util_timed_wait_for_fd(con->sock, header_timeout) <= 0) {
+		    INFO ("util_timed_wait_for_fd <= 0");
+            refbuf->sync_point = -pos;
+		    return -EAGAIN;
+	    }
+    }
+
+    WARN("Couldn't find enough data, pos = %d, data = %s, entire = %d.\n", pos, refbuf->data, flags);
+    refbuf->sync_point = 0;
+    return -ENOENT;
 }
 
 char *util_get_extension(const char *path) {

@@ -155,11 +155,11 @@ static client_t *open_relay_connection (relay_server *relay)
     ice_config_t *config;
     http_parser_t *parser = NULL;
     connection_t *con=NULL;
+    refbuf_t *header = NULL;
     char *server = strdup (relay->server);
     char *mount = strdup (relay->mount);
     int port = relay->port;
     char *auth_header;
-    char header[4096];
 
     config = config_get_config ();
     server_id = strdup (config->server_id);
@@ -187,6 +187,7 @@ static client_t *open_relay_connection (relay_server *relay)
     while (redirects < 10)
     {
         sock_t streamsock;
+	int hdrsize;
 
         INFO2 ("connecting to %s:%d", server, port);
 
@@ -197,6 +198,8 @@ static client_t *open_relay_connection (relay_server *relay)
             break;
         }
         con = connection_create (streamsock, -1, strdup (server));
+        if (!con)
+            break;
 
         /* At this point we may not know if we are relaying an mp3 or vorbis
          * stream, but only send the icy-metadata header if the relay details
@@ -214,15 +217,17 @@ static client_t *open_relay_connection (relay_server *relay)
                 server,
                 relay->mp3metadata?"Icy-MetaData: 1\r\n":"",
                 auth_header);
-        memset (header, 0, sizeof(header));
-        if (util_read_header (con->sock, header, 4096, READ_ENTIRE_HEADER) == 0)
+
+        header = refbuf_new (PER_CLIENT_REFBUF_SIZE);
+        hdrsize = util_read_header (con, header, HEADER_READ_ENTIRE);
+        if (hdrsize == -ENOENT)
         {
             ERROR4 ("Header read failed for %s (%s:%d%s)", relay->localmount, server, port, mount);
             break;
         }
         parser = httpp_create_parser();
         httpp_initialize (parser, NULL);
-        if (! httpp_parse_response (parser, header, strlen(header), relay->localmount))
+        if (! httpp_parse_response (parser, header->data, hdrsize, relay->localmount))
         {
             ERROR4("Error parsing relay request for %s (%s:%d%s)", relay->localmount,
                     server, port, mount);
@@ -280,7 +285,13 @@ static client_t *open_relay_connection (relay_server *relay)
             }
             global_unlock ();
             sock_set_blocking (streamsock, 0);
-            client_set_queue (client, NULL);
+
+	    header->len -= hdrsize;
+	    memmove(header->data, header->data + hdrsize, header->len);
+            client_set_queue (client, header);
+	    refbuf_release(header);
+
+	    client->pos = hdrsize;
             free (server);
             free (mount);
             free (server_id);
@@ -297,6 +308,8 @@ static client_t *open_relay_connection (relay_server *relay)
     free (auth_header);
     if (con)
         connection_close (con);
+    if (header)
+        refbuf_release (header);
     if (parser)
         httpp_destroy (parser);
     return NULL;
