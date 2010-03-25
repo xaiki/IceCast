@@ -4,7 +4,7 @@
  * This program is distributed under the GNU General Public License, version 2.
  * A copy of this license is included with this source.
  *
- * Copyright 2000-2004, Jack Moffitt <jack@xiph.org, 
+ * Copyright 2000-2004, Jack Moffitt <jack@xiph.org,
  *                      Michael Smith <msmith@xiph.org>,
  *                      oddsock <oddsock@xiph.org>,
  *                      Karl Heyes <karl@xiph.org>
@@ -461,7 +461,7 @@ static void format_mp3_free_plugin(format_plugin_t *self)
 
 /* This does the actual reading, making sure the read data is packaged in
  * blocks of 1400 bytes (near the common MTU size). This is because many
- * incoming streams come in small packets which could waste a lot of 
+ * incoming streams come in small packets which could waste a lot of
  * bandwidth with many listeners due to headers and such like.
  */
 static int complete_read (source_t *source)
@@ -476,7 +476,7 @@ static int complete_read (source_t *source)
 
     if (source_mp3->read_data == NULL)
     {
-        source_mp3->read_data = refbuf_new (REFBUF_SIZE); 
+        source_mp3->read_data = refbuf_new (REFBUF_SIZE);
         source_mp3->read_count = 0;
     }
     buf = source_mp3->read_data->data + source_mp3->read_count;
@@ -603,7 +603,7 @@ static refbuf_t *mp3_get_filter_meta (source_t *source)
             source_mp3->build_metadata_offset += bytes;
             break;
         }
-        /* copy all bytes except the last one, that way we 
+        /* copy all bytes except the last one, that way we
          * know a null byte terminates the message */
         memcpy (source_mp3->build_metadata + source_mp3->build_metadata_offset,
                 src, metadata_remaining-1);
@@ -654,6 +654,42 @@ static refbuf_t *mp3_get_filter_meta (source_t *source)
     return refbuf;
 }
 
+inline int format_mp3_insert_coremedia_header(client_t *client, char *ptr, int remaining) {
+    int range[2];
+    char *rangestr;
+    int read = 0;
+    int bytes;
+    rangestr = httpp_getvar(client->parser, "range");
+
+    if (rangestr != NULL) {
+	if (sscanf(rangestr, "bytes=%d-%d", &range[0], &range[1]) != 2)
+	    return 0;
+	if (range[0] < 0)
+	    return 0;
+
+	char currenttime[50];
+	time_t now;
+	int strflen;
+	struct tm result;
+	time(&now);
+	strflen = strftime(currenttime, 50, "%a, %d-%b-%Y %X GMT",
+			   gmtime_r(&now, &result));
+	client->respcode = 206;
+	bytes = snprintf(ptr, remaining, "Date: %s\r\n", currenttime);
+	if (bytes > 0){
+	    remaining -= bytes;
+	    read += bytes;
+	}
+	bytes = snprintf(ptr + read, remaining, "Content-Range: bytes %d-%d/221183499\r\n",
+			 range[0], range[1]);
+	if (bytes > 0) {
+	    remaining -= bytes;
+	    read += bytes;
+	}
+    }
+
+    return read;
+}
 
 static int format_mp3_create_client_data(source_t *source, client_t *client)
 {
@@ -681,7 +717,17 @@ static int format_mp3_create_client_data(source_t *source, client_t *client)
         /* avoid browser caching, reported via forum */
         bytes = snprintf (ptr, remaining, "Expires: Mon, 26 Jul 1997 05:00:00 GMT\r\n");
         remaining -= bytes;
-        ptr += bytes; 
+        ptr += bytes;
+    }
+
+    /* hack for iPhone OS or Simulator with CoreMedia. checks user agent then adds iPhone-specific headers */
+    if (useragent && strstr(useragent, "CoreMedia"))
+    {
+	bytes = format_mp3_insert_coremedia_header(client, ptr, remaining);
+	if (bytes) {
+	    ptr += bytes;
+	    remaining -= bytes;
+	}
     }
 
     client->format_data = client_mp3;
