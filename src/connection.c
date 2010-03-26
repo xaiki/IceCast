@@ -1122,8 +1122,9 @@ static void _handle_shoutcast_compatible (client_queue_t *node)
 
     if (node->shoutcast == 1)
     {
-        char *source_password, *ptr, *headers;
+        char *source_password, *headers;
         mount_proxy *mountinfo = config_find_mount (config, shoutcast_mount);
+        int hdrlen;
 
         if (mountinfo && mountinfo->password)
             source_password = strdup (mountinfo->password);
@@ -1131,35 +1132,18 @@ static void _handle_shoutcast_compatible (client_queue_t *node)
             source_password = strdup (config->source_password);
         config_release_config();
 
-        /* Get rid of trailing \r\n or \n after password */
-        ptr = strstr (client->refbuf->data, "\r\r\n");
-        if (ptr)
-            headers = ptr+3;
-        else
-        {
-            ptr = strstr (client->refbuf->data, "\r\n");
-            if (ptr)
-                headers = ptr+2;
-            else
-            {
-                ptr = strstr (client->refbuf->data, "\n");
-                if (ptr)
-                    headers = ptr+1;
-            }
-        }
 
-        if (ptr == NULL)
-        {
+        if ((hdrlen = util_find_eos_delim (client->refbuf, 0, HEADER_READ_LINE)) < 0) {
             client_destroy (client);
             free (source_password);
             free (node->shoutcast_mount);
             free (node);
             return;
         }
-        *ptr = '\0';
 
-        if (strcmp (client->refbuf->data, source_password) == 0)
-        {
+        headers = client->refbuf->data + hdrlen;
+
+        if (memmem (client->refbuf->data, hdrlen, source_password, strlen(source_password)) != NULL) {
             client->respcode = 200;
             /* send this non-blocking but if there is only a partial write
              * then leave to header timeout */
@@ -1172,8 +1156,8 @@ static void _handle_shoutcast_compatible (client_queue_t *node)
             free (source_password);
             return;
         }
-        else
-            INFO1 ("password does not match \"%s\"", client->refbuf->data);
+
+	INFO1 ("password does not match \"%s\"", client->refbuf->data);
         client_destroy (client);
         free (source_password);
         free (node->shoutcast_mount);
