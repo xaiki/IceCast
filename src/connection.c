@@ -608,50 +608,10 @@ static void process_request_queue (void)
 
         if (len > 0)
         {
-            int pass_it = 1;
-            char *ptr;
-
-            /* handle \n, \r\n and nsvcap which for some strange reason has
-             * EOL as \r\r\n */
             node->offset += len;
-            client->refbuf->data [node->offset] = '\000';
-            do
-            {
-                if (node->shoutcast == 1)
-                {
-                    /* password line */
-                    if (strstr (client->refbuf->data, "\r\r\n") != NULL)
-                        break;
-                    if (strstr (client->refbuf->data, "\r\n") != NULL)
-                        break;
-                    if (strstr (client->refbuf->data, "\n") != NULL)
-                        break;
-                }
-                /* stream_offset refers to the start of any data sent after the
-                 * http style headers, we don't want to lose those */
-                ptr = strstr (client->refbuf->data, "\r\r\n\r\r\n");
-                if (ptr)
-                {
-                    node->stream_offset = (ptr+6) - client->refbuf->data;
-                    break;
-                }
-                ptr = strstr (client->refbuf->data, "\r\n\r\n");
-                if (ptr)
-                {
-                    node->stream_offset = (ptr+4) - client->refbuf->data;
-                    break;
-                }
-                ptr = strstr (client->refbuf->data, "\n\n");
-                if (ptr)
-                {
-                    node->stream_offset = (ptr+2) - client->refbuf->data;
-                    break;
-                }
-                pass_it = 0;
-            } while (0);
-
-            if (pass_it)
-            {
+            if ((len = util_find_eos_delim(client->refbuf, -node->offset,
+			    node->shoutcast?HEADER_READ_LINE:HEADER_READ_ENTIRE)) < 0) {
+                node->stream_offset = len;
                 if ((client_queue_t **)_req_queue_tail == &(node->next))
                     _req_queue_tail = (volatile client_queue_t **)node_ref;
                 *node_ref = node->next;
