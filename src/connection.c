@@ -1114,6 +1114,7 @@ static void _handle_shoutcast_compatible (client_queue_t *node)
     ice_config_t *config = config_get_config ();
     char *shoutcast_mount;
     client_t *client = node->client;
+    refbuf_t *refbuf = client->refbuf;
 
     if (node->shoutcast_mount)
         shoutcast_mount = node->shoutcast_mount;
@@ -1122,7 +1123,7 @@ static void _handle_shoutcast_compatible (client_queue_t *node)
 
     if (node->shoutcast == 1)
     {
-        char *source_password, *headers;
+        char *source_password;
         mount_proxy *mountinfo = config_find_mount (config, shoutcast_mount);
         int hdrlen;
 
@@ -1132,7 +1133,6 @@ static void _handle_shoutcast_compatible (client_queue_t *node)
             source_password = strdup (config->source_password);
         config_release_config();
 
-
         if ((hdrlen = util_find_eos_delim (client->refbuf, 0, HEADER_READ_LINE)) < 0) {
             client_destroy (client);
             free (source_password);
@@ -1141,15 +1141,13 @@ static void _handle_shoutcast_compatible (client_queue_t *node)
             return;
         }
 
-        headers = client->refbuf->data + hdrlen;
-
-        if (memmem (client->refbuf->data, hdrlen, source_password, strlen(source_password)) != NULL) {
+        if (memmem (refbuf->data, hdrlen, source_password, strlen(source_password)) != NULL) {
             client->respcode = 200;
             /* send this non-blocking but if there is only a partial write
              * then leave to header timeout */
             sock_write (client->con->sock, "OK2\r\nicy-caps:11\r\n\r\n");
-            node->offset -= (headers - client->refbuf->data);
-            memmove (client->refbuf->data, headers, node->offset+1);
+            node->offset -= hdrlen;
+            memmove (refbuf->data, refbuf->data + hdrlen, node->offset+1);
             node->shoutcast = 2;
             /* we've checked the password, now send it back for reading headers */
             _add_request_queue (node);
@@ -1173,19 +1171,19 @@ static void _handle_shoutcast_compatible (client_queue_t *node)
     http_compliant_len = 20 + strlen (shoutcast_mount) + node->offset;
     http_compliant = (char *)calloc(1, http_compliant_len);
     snprintf (http_compliant, http_compliant_len,
-            "SOURCE %s HTTP/1.0\r\n%s", shoutcast_mount, client->refbuf->data);
+            "SOURCE %s HTTP/1.0\r\n%s", shoutcast_mount, refbuf->data);
     parser = httpp_create_parser();
     httpp_initialize(parser, NULL);
     if (httpp_parse (parser, http_compliant, strlen(http_compliant)))
     {
         /* we may have more than just headers, so prepare for it */
         if (node->stream_offset == node->offset)
-            client->refbuf->len = 0;
+            refbuf->len = 0;
         else
         {
-            char *ptr = client->refbuf->data;
-            client->refbuf->len = node->offset - node->stream_offset;
-            memmove (ptr, ptr + node->stream_offset, client->refbuf->len);
+            char *ptr = refbuf->data;
+            refbuf->len = node->offset - node->stream_offset;
+            memmove (ptr, ptr + node->stream_offset, refbuf->len);
         }
         client->parser = parser;
         source_startup (client, shoutcast_mount, SHOUTCAST_SOURCE_AUTH);
