@@ -1213,84 +1213,79 @@ static void _handle_connection(void)
     while (1)
     {
         node = _get_connection();
-        if (node)
+        if (! node)
+            break;
+
+        client_t *client = node->client;
+        char *uri;
+
+        /* Check for special shoutcast compatability processing */
+        if (node->shoutcast)
         {
-            client_t *client = node->client;
-
-            /* Check for special shoutcast compatability processing */
-            if (node->shoutcast)
-            {
-                _handle_shoutcast_compatible (node);
-                continue;
-            }
-
-            /* process normal HTTP headers */
-            parser = httpp_create_parser();
-            httpp_initialize(parser, NULL);
-            client->parser = parser;
-            if (httpp_parse (parser, client->refbuf->data, node->offset))
-            {
-                char *uri;
-
-                /* we may have more than just headers, so prepare for it */
-                if (node->stream_offset == node->offset)
-                    client->refbuf->len = 0;
-                else
-                {
-                    char *ptr = client->refbuf->data;
-                    client->refbuf->len = node->offset - node->stream_offset;
-                    memmove (ptr, ptr + node->stream_offset, client->refbuf->len);
-                }
-
-                rawuri = httpp_getvar(parser, HTTPP_VAR_URI);
-
-                /* assign a port-based shoutcast mountpoint if required */
-                if (node->shoutcast_mount && strcmp (rawuri, "/admin.cgi") == 0)
-                    httpp_set_query_param (client->parser, "mount", node->shoutcast_mount);
-
-                free (node->shoutcast_mount);
-                free (node);
-
-                if (strcmp("ICE",  httpp_getvar(parser, HTTPP_VAR_PROTOCOL)) &&
-                    strcmp("HTTP", httpp_getvar(parser, HTTPP_VAR_PROTOCOL))) {
-                    ERROR0("Bad HTTP protocol detected");
-                    client_destroy (client);
-                    continue;
-                }
-
-                uri = util_normalise_uri(rawuri);
-
-                if (uri == NULL)
-                {
-                    client_destroy (client);
-                    continue;
-                }
-
-                if (parser->req_type == httpp_req_source) {
-                    _handle_source_request (client, uri);
-                }
-                else if (parser->req_type == httpp_req_stats) {
-                    _handle_stats_request (client, uri);
-                }
-                else if (parser->req_type == httpp_req_get) {
-                    _handle_get_request (client, uri);
-                }
-                else {
-                    ERROR0("Wrong request type from client");
-                    client_send_400 (client, "unknown request");
-                }
-
-                free(uri);
-            }
-            else
-            {
-                free (node);
-                ERROR0("HTTP request parsing failed");
-                client_destroy (client);
-            }
+            _handle_shoutcast_compatible (node);
             continue;
         }
-        break;
+
+        /* process normal HTTP headers */
+        parser = httpp_create_parser();
+        httpp_initialize(parser, NULL);
+        client->parser = parser;
+        if (!httpp_parse (parser, client->refbuf->data, node->offset))
+        {
+            free (node);
+            ERROR0("HTTP request parsing failed");
+            client_destroy (client);
+            continue;
+        }
+
+        /* we may have more than just headers, so prepare for it */
+        if (node->stream_offset == node->offset) {
+            client->refbuf->len = 0;
+        } else {
+            char *ptr = client->refbuf->data;
+            client->refbuf->len = node->offset - node->stream_offset;
+            memmove (ptr, ptr + node->stream_offset, client->refbuf->len);
+        }
+
+        rawuri = httpp_getvar(parser, HTTPP_VAR_URI);
+
+        /* assign a port-based shoutcast mountpoint if required */
+        if (node->shoutcast_mount && strcmp (rawuri, "/admin.cgi") == 0)
+            httpp_set_query_param (client->parser, "mount", node->shoutcast_mount);
+
+        free (node->shoutcast_mount);
+        free (node);
+
+        if (strcmp("ICE",  httpp_getvar(parser, HTTPP_VAR_PROTOCOL)) &&
+            strcmp("HTTP", httpp_getvar(parser, HTTPP_VAR_PROTOCOL))) {
+            ERROR0("Bad HTTP protocol detected");
+            client_destroy (client);
+            continue;
+        }
+
+        uri = util_normalise_uri(rawuri);
+
+        if (uri == NULL)
+        {
+            client_destroy (client);
+            continue;
+        }
+
+        if (parser->req_type == httpp_req_source) {
+            _handle_source_request (client, uri);
+        }
+        else if (parser->req_type == httpp_req_stats) {
+            _handle_stats_request (client, uri);
+        }
+        else if (parser->req_type == httpp_req_get) {
+            _handle_get_request (client, uri);
+        }
+        else {
+            ERROR0("Wrong request type from client");
+            client_send_400 (client, "unknown request");
+        }
+
+        free(uri);
     }
 }
 
