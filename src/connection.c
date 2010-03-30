@@ -1217,7 +1217,9 @@ static void _handle_connection(void)
             break;
 
         client_t *client = node->client;
+        refbuf_t *refbuf = client->refbuf;
         char *uri;
+
 
         /* Check for special shoutcast compatability processing */
         if (node->shoutcast)
@@ -1230,7 +1232,7 @@ static void _handle_connection(void)
         parser = httpp_create_parser();
         httpp_initialize(parser, NULL);
         client->parser = parser;
-        if (!httpp_parse (parser, client->refbuf->data, node->offset))
+        if (!httpp_parse (parser, refbuf->data, node->offset))
         {
             free (node);
             ERROR0("HTTP request parsing failed");
@@ -1240,11 +1242,11 @@ static void _handle_connection(void)
 
         /* we may have more than just headers, so prepare for it */
         if (node->stream_offset == node->offset) {
-            client->refbuf->len = 0;
+            refbuf->len = 0;
         } else {
-            char *ptr = client->refbuf->data;
-            client->refbuf->len = node->offset - node->stream_offset;
-            memmove (ptr, ptr + node->stream_offset, client->refbuf->len);
+            char *ptr = refbuf->data;
+            refbuf->len = node->offset - node->stream_offset;
+            memmove (ptr, ptr + node->stream_offset, refbuf->len);
         }
 
         rawuri = httpp_getvar(parser, HTTPP_VAR_URI);
