@@ -585,12 +585,9 @@ static client_queue_t *_get_connection(void)
 
 
 /* run along queue checking for any data that has come in or a timeout */
-static void process_request_queue (void)
+static void process_request_queue (int timeout)
 {
     client_queue_t **node_ref = (client_queue_t **)&_req_queue;
-    ice_config_t *config = config_get_config ();
-    int timeout = config->header_timeout;
-    config_release_config();
 
     while (*node_ref)
     {
@@ -654,9 +651,11 @@ void connection_accept_loop (void)
     connection_t *con;
     ice_config_t *config;
     int duration = 300;
+    int timeout = 0;
 
     config = config_get_config ();
     get_ssl_certificate (config);
+    timeout = config->header_timeout;
     config_release_config ();
 
     while (global.running == ICE_RUNNING)
@@ -724,7 +723,7 @@ void connection_accept_loop (void)
             if (_req_queue == NULL)
                 duration = 300; /* use longer timeouts when nothing waiting */
         }
-        process_request_queue ();
+        process_request_queue (timeout);
     }
 
     /* Give all the other threads notification to shut down */
