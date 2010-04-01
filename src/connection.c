@@ -533,10 +533,11 @@ static connection_t *_accept_connection(int duration)
         if (strncmp (ip, "::ffff:", 7) == 0)
             memmove (ip, ip+7, strlen (ip+7)+1);
 
-        if (accept_ip_address (ip))
+        if (accept_ip_address (ip)) {
             con = connection_create (sock, serversock, ip);
-        if (con)
-            return con;
+            if (con)
+                return con;
+        }
         sock_close (sock);
     }
     else
