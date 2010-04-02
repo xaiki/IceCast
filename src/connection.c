@@ -993,45 +993,46 @@ static void _handle_source_request (client_t *client, const char *uri)
 void source_startup (client_t *client, const char *uri, int auth_style)
 {
     source_t *source;
+    refbuf_t *ok;
     source = source_reserve (uri);
 
-    if (source)
-    {
-        source->client = client;
-        source->parser = client->parser;
-        source->con = client->con;
-        if (connection_complete_source (source, 1) < 0)
-        {
-            source_clear_source (source);
-            source_free_source (source);
-            return;
-        }
-        client->respcode = 200;
-        if (auth_style == SHOUTCAST_SOURCE_AUTH)
-        {
-            source->shoutcast_compat = 1;
-            source_client_callback (client, source);
-        }
-        else
-        {
-            refbuf_t *ok = refbuf_new (PER_CLIENT_REFBUF_SIZE);
-            client->respcode = 200;
-            snprintf (ok->data, PER_CLIENT_REFBUF_SIZE,
-                    "HTTP/1.0 200 OK\r\n\r\n");
-            ok->len = strlen (ok->data);
-            /* we may have unprocessed data read in, so don't overwrite it */
-            ok->associated = client->refbuf;
-            client->refbuf = ok;
-            fserve_add_client_callback (client, source_client_callback, source);
-        }
-    }
-    else
-    {
+    if (!source) {
         client_send_403 (client, "Mountpoint in use");
         WARN1 ("Mountpoint %s in use", uri);
+        return;
+    }
+
+    source->client = client;
+    source->parser = client->parser;
+    source->con = client->con;
+    if (connection_complete_source (source, 1) < 0) {
+        source_clear_source (source);
+        source_free_source (source);
+        return;
+    }
+    client->respcode = 200;
+    switch (auth_style) {
+    case SHOUTCAST_SOURCE_AUTH:
+        source->shoutcast_compat = 1;
+    case NOAUTH_SOURCE_AUTH:
+        source_client_callback (client, source);
+        break;
+    case ICECAST_SOURCE_AUTH:
+        ok = refbuf_new (PER_CLIENT_REFBUF_SIZE);
+        client->respcode = 200;
+        snprintf (ok->data, PER_CLIENT_REFBUF_SIZE,
+                  "HTTP/1.0 200 OK\r\n\r\n");
+        ok->len = strlen (ok->data);
+        /* we may have unprocessed data read in, so don't overwrite it */
+        ok->associated = client->refbuf;
+        client->refbuf = ok;
+        fserve_add_client_callback (client, source_client_callback, source);
+        break;
+    default:
+        WARN1("Got unkown source auth type: %d", auth_style);
+        return;
     }
 }
-
 
 static void _handle_stats_request (client_t *client, char *uri)
 {
