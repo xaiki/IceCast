@@ -551,6 +551,101 @@ static connection_t *_accept_connection(int duration)
     return NULL;
 }
 
+int connection_process (connection_t *con, int timeout) {
+    ice_config_t *config;
+    client_t *client = NULL;
+    listener_t *listener;
+    refbuf_t *header = NULL;
+    http_parser_t *parser = NULL;
+    int hdrsize = 0;
+    int shoutcast = 0;
+    char *shoutcast_mount = NULL;
+
+    header = refbuf_new (PER_CLIENT_REFBUF_SIZE);
+    hdrsize = util_read_header (con, header, HEADER_READ_ENTIRE);
+    if (hdrsize < 0)
+    {
+        global_unlock();
+        ERROR ("Header read failed");
+        thread_sleep (400000);
+        return -1;
+    }
+
+    /* process normal HTTP headers */
+    parser = httpp_create_parser();
+    httpp_initialize(parser, NULL);
+    if (!httpp_parse (parser, header->data, hdrsize))
+    {
+        ERROR0("HTTP request parsing failed");
+        client_destroy (client);
+        return -1;
+    }
+
+    if (httpp_getvar (parser, HTTPP_VAR_ERROR_MESSAGE))
+    {
+        ERROR("Error(%s)", httpp_getvar(parser, HTTPP_VAR_ERROR_MESSAGE));
+        return -1;
+    }
+
+    if (header->sync_point && (parser->req_type == httpp_req_source ||
+                               parser->req_type == httpp_req_post)) {
+	    hdrsize = util_read_header (con, header, HEADER_READ_ENTIRE);
+	    if (hdrsize < 0) {
+            INFO ("Header read failed");
+            return hdrsize;
+        }
+    }
+
+    global_lock();
+    if (client_create (&client, con, parser) < 0)
+    {
+        global_unlock();
+        client_send_403 (client, "Icecast connection limit reached");
+        /* don't be too eager as this is an imposed hard limit */
+        thread_sleep (400000);
+        return -1;
+    }
+
+    if (sock_set_blocking (client->con->sock, 0) || sock_set_nodelay (client->con->sock))
+    {
+        global_unlock();
+        WARN0 ("failed to set tcp options on client connection, dropping");
+        client_destroy (client);
+        return -1;
+    }
+
+    header->len -= hdrsize;
+    memmove(header->data, header->data + hdrsize, header->len);
+    client_set_queue (client, header);
+    refbuf_release(header);
+
+    config = config_get_config();
+    listener = config_get_listen_sock (config, client->con);
+
+    if (listener)
+    {
+        if (listener->shoutcast_compat)
+            shoutcast = 1;
+        if (listener->ssl && ssl_ok)
+            connection_uses_ssl (client->con);
+        if (listener->shoutcast_mount)
+            shoutcast_mount = strdup (listener->shoutcast_mount);
+    }
+    global_unlock();
+    config_release_config();
+
+    if (client->con->con_time + timeout <= time(NULL))
+        return -1;
+
+    stats_event_inc (NULL, "connections");
+
+    if (shoutcast) {
+        _handle_shoutcast_compatible (shoutcast, shoutcast_mount);
+        return 0;
+    }
+    return _handle_client (client);
+}
+
 void connection_accept_loop (void)
 {
     connection_t *con;
@@ -572,94 +667,8 @@ void connection_accept_loop (void)
             continue;
         }
 
-        ice_config_t *config;
-        client_t *client = NULL;
-        listener_t *listener;
-        refbuf_t *header = NULL;
-        http_parser_t *parser = NULL;
-        int hdrsize = 0;
-        int shoutcast = 0;
-        char *shoutcast_mount = NULL;
-
-        header = refbuf_new (PER_CLIENT_REFBUF_SIZE);
-        hdrsize = util_read_header (con, header, HEADER_READ_ENTIRE);
-        if (hdrsize < 0)
-        {
-            global_unlock();
-            ERROR ("Header read failed");
-            thread_sleep (400000);
-            continue;
-        }
-
-        /* process normal HTTP headers */
-        parser = httpp_create_parser();
-        httpp_initialize(parser, NULL);
-        if (!httpp_parse (parser, header->data, hdrsize))
-        {
-            ERROR0("HTTP request parsing failed");
-            client_destroy (client);
-            continue;
-        }
-
-        if (httpp_getvar (parser, HTTPP_VAR_ERROR_MESSAGE))
-        {
-            ERROR("Error(%s)", httpp_getvar(parser, HTTPP_VAR_ERROR_MESSAGE));
-            break;
-        }
-
-        global_lock();
-        if (client_create (&client, con, parser) < 0)
-        {
-            global_unlock();
-            client_send_403 (client, "Icecast connection limit reached");
-            /* don't be too eager as this is an imposed hard limit */
-            thread_sleep (400000);
-            continue;
-        }
-
-        client_set_queue (client, header);
-
-        if (sock_set_blocking (client->con->sock, 0) || sock_set_nodelay (client->con->sock))
-        {
-            global_unlock();
-            WARN0 ("failed to set tcp options on client connection, dropping");
-            client_destroy (client);
-            continue;
-        }
-
-        header->len -= hdrsize;
-        memmove(header->data, header->data + hdrsize, header->len);
-        client_set_queue (client, header);
-        refbuf_release(header);
-
-//        client->pos = hdrsize;
-
-        config = config_get_config();
-        listener = config_get_listen_sock (config, client->con);
-
-        if (listener)
-        {
-            if (listener->shoutcast_compat)
-                shoutcast = 1;
-            if (listener->ssl && ssl_ok)
-                connection_uses_ssl (client->con);
-            if (listener->shoutcast_mount)
-                shoutcast_mount = strdup (listener->shoutcast_mount);
-        }
-        global_unlock();
-        config_release_config();
-
-        stats_event_inc (NULL, "connections");
-        duration = 5;
-
-        if (client->con->con_time + timeout <= time(NULL))
-            continue;
-
-        if (shoutcast) {
-            _handle_shoutcast_compatible (shoutcast, shoutcast_mount);
-        } else {
-            _handle_client (client);
-        }
+        if (connection_process (con, timeout) != -1)
+            duration = 5;
     }
 
     /* Give all the other threads notification to shut down */
