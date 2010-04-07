@@ -1015,7 +1015,6 @@ void source_startup (client_t *client, const char *uri, int auth_style)
     case SHOUTCAST_SOURCE_AUTH:
         source->shoutcast_compat = 1;
     case NOAUTH_SOURCE_AUTH:
-        source_client_callback (client, source);
         break;
     case ICECAST_SOURCE_AUTH:
         ok = refbuf_new (PER_CLIENT_REFBUF_SIZE);
@@ -1026,12 +1025,12 @@ void source_startup (client_t *client, const char *uri, int auth_style)
         /* we may have unprocessed data read in, so don't overwrite it */
         ok->associated = client->refbuf;
         client->refbuf = ok;
-        fserve_add_client_callback (client, source_client_callback, source);
         break;
     default:
         WARN1("Got unkown source auth type: %d", auth_style);
         return;
     }
+    fserve_add_client_callback (client, source_client_callback, source);
 }
 
 static void _handle_stats_request (client_t *client, char *uri)
