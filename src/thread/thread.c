@@ -493,10 +493,21 @@ void thread_mutex_unlock_c(mutex_t *mutex, int line, char *file)
 #endif /* DEBUG_MUTEXES */
 }
 
-void thread_cond_create_c(cond_t *cond, int line, char *file)
+void thread_cond_init(cond_t *cond)
 {
     pthread_cond_init(&cond->sys_cond, NULL);
     pthread_mutex_init(&cond->cond_mutex, NULL);
+}
+
+cond_t *thread_cond_create(void)
+{
+    cond_t *cond = calloc (1, sizeof(cond_t));
+    if (!cond)
+        return;
+
+    thread_cond_init(cond);
+
+    return cond;
 }
 
 void thread_cond_destroy(cond_t *cond)
