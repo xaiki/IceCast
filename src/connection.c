@@ -144,7 +144,7 @@ void connection_initialize(void)
     thread_spin_create (&_connection_lock);
     thread_mutex_create(&move_clients_mutex);
     thread_rwlock_create(&_source_shutdown_rwlock);
-    thread_cond_create(&global.shutdown_cond);
+    thread_cond_init(&global.shutdown_cond);
     _req_queue = NULL;
     _req_queue_tail = &_req_queue;
     _con_queue = NULL;

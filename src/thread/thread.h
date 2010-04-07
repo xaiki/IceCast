@@ -111,7 +111,7 @@ typedef mutex_t spin_t;
 #define thread_mutex_create(x) thread_mutex_create_c(x,__LINE__,__FILE__)
 #define thread_mutex_lock(x) thread_mutex_lock_c(x,__LINE__,__FILE__)
 #define thread_mutex_unlock(x) thread_mutex_unlock_c(x,__LINE__,__FILE__)
-#define thread_cond_create(x) thread_cond_create_c(x,__LINE__,__FILE__)
+//#define thread_cond_create() thread_cond_create_c(__LINE__,__FILE__)
 #define thread_cond_signal(x) thread_cond_signal_c(x,__LINE__,__FILE__)
 #define thread_cond_broadcast(x) thread_cond_broadcast_c(x,__LINE__,__FILE__)
 #define thread_cond_wait(x) thread_cond_wait_c(x,__LINE__,__FILE__)
@@ -169,7 +169,8 @@ void thread_mutex_create_c(mutex_t *mutex, int line, char *file);
 void thread_mutex_lock_c(mutex_t *mutex, int line, char *file);
 void thread_mutex_unlock_c(mutex_t *mutex, int line, char *file);
 void thread_mutex_destroy(mutex_t *mutex);
-void thread_cond_create_c(cond_t *cond, int line, char *file);
+void thread_cond_init(cond_t *cond);
+cond_t *thread_cond_create(void);
 void thread_cond_signal_c(cond_t *cond, int line, char *file);
 void thread_cond_broadcast_c(cond_t *cond, int line, char *file);
 void thread_cond_wait_c(cond_t *cond, int line, char *file);
