@@ -664,6 +664,7 @@ static int _connection_process (connection_queue_t *node) {
     http_parser_t *parser = NULL;
     int hdrsize = 0;
     int shoutcast = 0;
+    int err;
     char *shoutcast_mount = NULL;
 
     if (!node->refbuf)
@@ -672,26 +673,24 @@ static int _connection_process (connection_queue_t *node) {
     hdrsize = util_read_header (node->con, header, HEADER_READ_ENTIRE);
     if (hdrsize < 0)
     {
-        global_unlock();
         ERROR ("Header read failed");
-        thread_sleep (400000);
-        return -1;
+        return hdrsize;
     }
 
     /* process normal HTTP headers */
     parser = httpp_create_parser();
     httpp_initialize(parser, NULL);
-    if (!httpp_parse (parser, header->data, hdrsize))
+    err = httpp_parse (parser, header->data, hdrsize);
+    if (err == 0)
     {
         ERROR0("HTTP request parsing failed");
-        client_destroy (client);
-        return -1;
+        return -EINVAL;
     }
 
     if (httpp_getvar (parser, HTTPP_VAR_ERROR_MESSAGE))
     {
         ERROR("Error(%s)", httpp_getvar(parser, HTTPP_VAR_ERROR_MESSAGE));
-        return -1;
+        return err;
     }
 
     if (header->sync_point && (parser->req_type == httpp_req_source ||
@@ -704,13 +703,13 @@ static int _connection_process (connection_queue_t *node) {
     }
 
     global_lock();
-    if (client_create (&client, node->con, parser) < 0)
+    err = client_create (&client, node->con, parser);
+    if (err < 0)
     {
         global_unlock();
         client_send_403 (client, "Icecast connection limit reached");
         /* don't be too eager as this is an imposed hard limit */
-        thread_sleep (400000);
-        return -1;
+        return err;
     }
 
     if (sock_set_blocking (client->con->sock, 0) || sock_set_nodelay (client->con->sock))
