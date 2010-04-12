@@ -85,6 +85,7 @@
 typedef struct connection_queue_tag {
     connection_t *con;
     refbuf_t *refbuf;
+    http_parser_t *parser;
     struct connection_queue_tag *next;
 } connection_queue_t;
 
@@ -678,17 +679,20 @@ static int _connection_process (connection_queue_t *node) {
     }
 
     /* process normal HTTP headers */
-    parser = httpp_create_parser();
-    httpp_initialize(parser, NULL);
+    if (node->parser) {
+        parser = node->parser;
+    } else {
+        parser = node->parser = httpp_create_parser();
+        httpp_initialize(parser, NULL);
+    }
+
     err = httpp_parse (parser, header->data, hdrsize);
-    if (err == 0)
-    {
+    if (err == 0) {
         ERROR0("HTTP request parsing failed");
         return -EINVAL;
     }
 
-    if (httpp_getvar (parser, HTTPP_VAR_ERROR_MESSAGE))
-    {
+    if (httpp_getvar (parser, HTTPP_VAR_ERROR_MESSAGE)) {
         ERROR("Error(%s)", httpp_getvar(parser, HTTPP_VAR_ERROR_MESSAGE));
         return err;
     }
@@ -721,8 +725,10 @@ static int _connection_process (connection_queue_t *node) {
     }
 
     header->len -= hdrsize;
-    memmove(header->data, header->data + hdrsize, header->len);
-    client_set_queue (client, header);
+    if (header->len) {
+        memmove(header->data, header->data + hdrsize, header->len);
+        client_set_queue (client, header);
+    }
     refbuf_release(header);
 
     config = config_get_config();
