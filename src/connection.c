@@ -805,7 +805,7 @@ void connection_accept_loop (void)
     connection_queue_t *node;
     connection_t *con;
     ice_config_t *config;
-    int duration = 300;
+    int duration = 3000;
     int timeout = 0;
 
     config = config_get_config ();
@@ -818,7 +818,7 @@ void connection_accept_loop (void)
         con = _accept_connection (duration);
 
         if (!con) {
-            duration = 300; /* use longer timeouts when nothing waiting */
+            duration = 30000; /* use longer timeouts when nothing waiting */
             continue;
         }
 
@@ -828,6 +828,7 @@ void connection_accept_loop (void)
          * connection loop will do all the dirty work */
         node =_connection_new (con);
         _add_connection (node);
+        duration = 3000;
     }
 
     /* Give all the other threads notification to shut down */
