@@ -86,6 +86,7 @@ typedef struct connection_queue_tag {
     connection_t *con;
     refbuf_t *refbuf;
     http_parser_t *parser;
+    client_t *client;
     struct connection_queue_tag *next;
 } connection_queue_t;
 
@@ -616,6 +617,12 @@ static connection_queue_t *_get_connection(void)
 static void destroy_node (connection_queue_t *node) {
     INFO("destroying node");
 
+    if (node->client)
+        client_destroy(node->client);
+    if (node->parser)
+        httpp_destroy(node->parser);
+    if (node->refbuf)
+        refbuf_release(node->refbuf);
     if (node->con)
         connection_close(node->con);
     free(node);
@@ -657,9 +664,43 @@ static void *_connection_thread (void *arg)
     return NULL;
 }
 
+static int connection_client_setup (connection_queue_t *node) {
+    int err;
+
+    global_lock();
+    err = client_create (&node->client, node->con, node->parser);
+    if (err < 0) {
+        client_send_403 (node->client, "Icecast connection limit reached");
+        /* don't be too eager as this is an imposed hard limit */
+        goto out_fail;
+    }
+
+    err = -EINVAL;
+    if (sock_set_blocking (node->con->sock, 0) || sock_set_nodelay (node->con->sock)) {
+        WARN0 ("failed to set tcp options on client connection, dropping");
+        goto out_destroy_client;
+    }
+
+/* XXX(xaiki): this should be 1, but actually, it's buggy, the client is already up and all.. */
+    err = -ENOENT;
+    if (node->con->con_timeout <= time(NULL)) {
+        WARN("there might be a bug if you see this");
+        goto out_destroy_client;
+    }
+
+    global_unlock();
+
+    return 0;
+
+out_destroy_client:
+    client_destroy (node->client);
+out_fail:
+    global_unlock();
+    return err;
+}
+
 static int _connection_process (connection_queue_t *node) {
     ice_config_t *config;
-    client_t *client = NULL;
     listener_t *listener;
     refbuf_t *header;
     http_parser_t *parser = NULL;
@@ -706,50 +747,37 @@ static int _connection_process (connection_queue_t *node) {
         }
     }
 
-    global_lock();
-    err = client_create (&client, node->con, parser);
-    if (err < 0)
-    {
-        global_unlock();
-        client_send_403 (client, "Icecast connection limit reached");
-        /* don't be too eager as this is an imposed hard limit */
-        return err;
-    }
-
-    if (sock_set_blocking (client->con->sock, 0) || sock_set_nodelay (client->con->sock))
-    {
-        global_unlock();
-        WARN0 ("failed to set tcp options on client connection, dropping");
-        client_destroy (client);
-        return -1;
+    if (! node->client) {
+        err = connection_client_setup (node);
+        if (err < 0)
+            return err;
     }
 
     header->len -= hdrsize;
     if (header->len) {
         memmove(header->data, header->data + hdrsize, header->len);
-        client_set_queue (client, header);
+        client_set_queue (node->client, header);
     }
     refbuf_release(header);
 
     config = config_get_config();
-    listener = config_get_listen_sock (config, client->con);
+    listener = config_get_listen_sock (config, node->con);
 
     if (listener)
     {
         if (listener->shoutcast_compat)
             shoutcast = 1;
         if (listener->ssl && ssl_ok)
-            connection_uses_ssl (client->con);
+            connection_uses_ssl (node->con);
         if (listener->shoutcast_mount)
             shoutcast_mount = strdup (listener->shoutcast_mount);
     }
-    global_unlock();
     config_release_config();
 
 /* XXX(xaiki): this should be 1, but actually, it's buggy, the client is already up and all.. */
-    if (client->con->con_timeout <= time(NULL)) {
+    if (node->con->con_timeout <= time(NULL)) {
         WARN("there might be a bug if you see this");
-        client_destroy (client);
+        client_destroy (node->client);
         return -1;
     }
 
@@ -759,7 +787,7 @@ static int _connection_process (connection_queue_t *node) {
         _handle_shoutcast_compatible (shoutcast, shoutcast_mount);
         return 0;
     }
-    return _handle_client (client);
+    return _handle_client (node->client);
 }
 
 void connection_accept_loop (void)
