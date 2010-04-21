@@ -116,8 +116,8 @@ cache_file_contents banned_ip, allowed_ip;
 
 rwlock_t _source_shutdown_rwlock;
 
-static void _handle_shoutcast_compatible (int shoutcast, char *shoutcast_mount);
 static int _handle_client (client_t *client);
+static int _handle_shoutcast_stage1 (connection_queue_t *node, char *shoutcast_mount, mount_proxy *mountinfo);
 static int _connection_process (connection_queue_t *node);
 static void *_connection_thread (void *arg);
 
@@ -699,19 +699,52 @@ out_fail:
     return err;
 }
 
+/* we don't need to clean up on err, as we'll go through the node struct and clean all we have inside */
 static int _connection_process (connection_queue_t *node) {
-    ice_config_t *config;
-    listener_t *listener;
     refbuf_t *header;
     http_parser_t *parser = NULL;
     int hdrsize = 0;
     int shoutcast = 0;
     int err;
     char *shoutcast_mount = NULL;
+    mount_proxy *mountinfo;
+
+    ice_config_t *config;
+    listener_t *listener;
 
     if (!node->refbuf)
 	    node->refbuf = refbuf_new (PER_CLIENT_REFBUF_SIZE);
     header = node->refbuf;
+
+    { /* this code tests for shoutcastness */
+        config = config_get_config();
+        listener = config_get_listen_sock (config, node->con);
+
+        if (listener) {
+            WARN("listner");
+            if (listener->shoutcast_compat)
+                shoutcast = 1;
+            if (listener->ssl && ssl_ok)
+                connection_uses_ssl (node->con);
+            if (listener->shoutcast_mount) {
+                shoutcast_mount = strdup (listener->shoutcast_mount);
+            } else {
+                shoutcast_mount = config->shoutcast_mount;
+            }
+        }
+
+        WARN("shoutcast %d, mount %s", shoutcast, shoutcast_mount);
+
+        mountinfo = config_find_mount (config, shoutcast_mount);
+        config_release_config();
+    }
+
+    if (shoutcast && !header->sync_point) { /* stage2 is actually handled by generic code */
+        err = _handle_shoutcast_stage1 (node, shoutcast_mount, mountinfo);
+        if (err < 0)
+            return err;
+    }
+
     hdrsize = util_read_header (node->con, header, HEADER_READ_ENTIRE);
     if (hdrsize < 0)
     {
@@ -751,42 +784,19 @@ static int _connection_process (connection_queue_t *node) {
         err = connection_client_setup (node);
         if (err < 0)
             return err;
-    }
 
-    header->len -= hdrsize;
-    if (header->len) {
-        memmove(header->data, header->data + hdrsize, header->len);
-        client_set_queue (node->client, header);
-    }
-    refbuf_release(header);
-
-    config = config_get_config();
-    listener = config_get_listen_sock (config, node->con);
-
-    if (listener)
-    {
-        if (listener->shoutcast_compat)
-            shoutcast = 1;
-        if (listener->ssl && ssl_ok)
-            connection_uses_ssl (node->con);
-        if (listener->shoutcast_mount)
-            shoutcast_mount = strdup (listener->shoutcast_mount);
-    }
-    config_release_config();
-
-/* XXX(xaiki): this should be 1, but actually, it's buggy, the client is already up and all.. */
-    if (node->con->con_timeout <= time(NULL)) {
-        WARN("there might be a bug if you see this");
-        client_destroy (node->client);
-        return -1;
+        header->len -= hdrsize;
+        if (header->len) {
+            memmove(header->data, header->data + hdrsize, header->len);
+            client_set_queue (node->client, header);
+        }
+        refbuf_release(header);
     }
 
     stats_event_inc (NULL, "connections");
 
-    if (shoutcast) {
-        _handle_shoutcast_compatible (shoutcast, shoutcast_mount);
-        return 0;
-    }
+    WARN("shoutcast = %d", shoutcast);
+
     return _handle_client (node->client);
 }
 
@@ -1206,81 +1216,51 @@ static void _handle_get_request (client_t *client, char *passed_uri)
     if (uri != passed_uri) free (uri);
 }
 
-static void _handle_shoutcast_compatible (int shoutcast, char *shoutcast_mount)
+static int _handle_shoutcast_stage1 (connection_queue_t *node, char *shoutcast_mount, mount_proxy *mountinfo)
 {
-/*
-  SHOUTCAST IS BROKEN
-*/
-    char *http_compliant;
-    int http_compliant_len = 0;
-    http_parser_t *parser;
-    ice_config_t *config = config_get_config ();
-    client_t *client = NULL; //node->client;
-    refbuf_t *refbuf = client->refbuf;
+    refbuf_t *refbuf = node->refbuf;
+    char *source_password;
+    int err, passlen;
 
-    if (!shoutcast_mount)
-        shoutcast_mount = config->shoutcast_mount;
+    WARN ("IN");
 
-    if (shoutcast == 1)
-    {
-        char *source_password;
-        mount_proxy *mountinfo = config_find_mount (config, shoutcast_mount);
-        int hdrlen;
-
-        if (mountinfo && mountinfo->password)
-            source_password = strdup (mountinfo->password);
-        else
-            source_password = strdup (config->source_password);
+    if (mountinfo && mountinfo->password) {
+        source_password = strdup (mountinfo->password);
+    } else {
+        ice_config_t *config = config_get_config ();
+        source_password = strdup (config->source_password);
         config_release_config();
-
-        if ((hdrlen = util_find_eos_delim (client->refbuf, 0, HEADER_READ_LINE)) < 0) {
-            client_destroy (client);
-            free (source_password);
-            return;
-        }
-
-        if (memmem (refbuf->data, hdrlen, source_password, strlen(source_password)) != NULL) {
-            client->respcode = 200;
-            /* send this non-blocking but if there is only a partial write
-             * then leave to header timeout */
-            sock_write (client->con->sock, "OK2\r\nicy-caps:11\r\n\r\n");
-            shoutcast = 2;
-            /* we've checked the password, now send it back for reading headers */
-//            _add_request_queue (node);
-            free (source_password);
-            return;
-        }
-
-        INFO1 ("password does not match \"%s\"", refbuf->data);
-
-        client_destroy (client);
-        free (source_password);
-        return;
     }
-    /* actually make a copy as we are dropping the config lock */
-    shoutcast_mount = strdup (shoutcast_mount);
-    config_release_config();
-    /* Here we create a valid HTTP request based of the information
-       that was passed in via the non-HTTP style protocol above. This
-       means we can use some of our existing code to handle this case */
-//    http_compliant_len = 20 + strlen (shoutcast_mount) + node->offset;
-    http_compliant = (char *)calloc(1, http_compliant_len);
-    snprintf (http_compliant, http_compliant_len,
-            "SOURCE %s HTTP/1.0\r\n%s", shoutcast_mount, refbuf->data);
-    parser = httpp_create_parser();
-    httpp_initialize(parser, NULL);
-    if (httpp_parse (parser, http_compliant, strlen(http_compliant)))
-    {
-        client->parser = parser;
-        source_startup (client, shoutcast_mount, SHOUTCAST_SOURCE_AUTH);
+
+    passlen = util_read_header (node->con, refbuf, HEADER_READ_LINE);
+    if (passlen <= 0) {
+        WARN ("HEADER READ FAILED");
+        err = passlen;
+        goto out_FAIL;
     }
-    else {
-        httpp_destroy (parser);
-        client_destroy (client);
+
+    if (memmem (refbuf->data, passlen, source_password, strlen(source_password)) == NULL) {
+        INFO ("password does not match (%d) \"%s\" (%d) \"%s\"",
+              strlen(source_password), source_password, passlen, refbuf->data);
+        err = -ENOENT;
+        goto out_FAIL;
     }
-    free (http_compliant);
-    free (shoutcast_mount);
-    return;
+
+/* send this non-blocking but if there is only a partial write
+ * then leave to header timeout */
+    sock_write (node->con->sock, "OK2\r\nicy-caps:11\r\n\r\n");
+
+    WARN ("OK2\r\nicy-caps:11\r\n\r\n");
+
+    refbuf->sync_point = snprintf (refbuf->data, refbuf->len, "POST %s HTTP/1.0\r\n", shoutcast_mount);
+
+    /* we've checked the password, now send it back for reading headers */
+    free (source_password);
+    return 0;
+
+out_FAIL:
+    free (source_password);
+    return err;
 }
 
 static int _handle_client (client_t *client)
