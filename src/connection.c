@@ -78,6 +78,7 @@
 
    Icecast auth style uses HTTP and Basic Authorization.
 */
+#define NOAUTH_SOURCE_AUTH 2
 #define SHOUTCAST_SOURCE_AUTH 1
 #define ICECAST_SOURCE_AUTH 0
 
@@ -960,7 +961,13 @@ int connection_check_pass (http_parser_t *parser, const char *user, const char *
     }
     return ret;
 }
+/* XXX(xaiki): This may need AUTH support */
+static void _handle_post_request (client_t *client, const char *uri)
+{
+    INFO1("Source logging in at mountpoint \"%s\"", uri);
 
+    source_startup (client, uri, NOAUTH_SOURCE_AUTH);
+}
 
 /* only called for native icecast source clients */
 static void _handle_source_request (client_t *client, const char *uri)
@@ -1275,6 +1282,9 @@ static void _handle_connection(void)
 
         if (parser->req_type == httpp_req_source) {
             _handle_source_request (client, uri);
+        }
+        else if (parser->req_type == httpp_req_post) {
+            _handle_post_request (client, uri);
         }
         else if (parser->req_type == httpp_req_stats) {
             _handle_stats_request (client, uri);
