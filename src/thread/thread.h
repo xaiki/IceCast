@@ -32,7 +32,7 @@ typedef struct {
 
     /* the time the thread was created */
     time_t create_time;
-    
+
     /* the file and line which created this thread */
     char *file;
     int line;
@@ -55,7 +55,7 @@ typedef struct {
 
     /* the file and line where the mutex was locked */
     char *file;
-    int line;    
+    int line;
 
 #endif
 
@@ -163,7 +163,7 @@ void thread_initialize_with_log_id(int log_id);
 void thread_shutdown(void);
 
 /* creation, destruction, locking, unlocking, signalling and waiting */
-thread_type *thread_create_c(char *name, void *(*start_routine)(void *), 
+thread_type *thread_create_c(char *name, void *(*start_routine)(void *),
         void *arg, int detached, int line, char *file);
 void thread_mutex_create_c(mutex_t *mutex, int line, char *file);
 void thread_mutex_lock_c(mutex_t *mutex, int line, char *file);

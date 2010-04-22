@@ -80,7 +80,7 @@ icecast2 (1.9+2.0alphasnap2+20030714-0.2) unstable; urgency=low
 icecast2 (1.9+2.0alphasnap2+20030714-0.1) unstable; urgency=low
 
   * New daily snapshot build.
-  * Updated versioning scheme to reflect (as well as possible) that the 
+  * Updated versioning scheme to reflect (as well as possible) that the
     source is a daily snapshot now, not CVS.
 
  -- Keegan Quinn <ice@thebasement.org>  Mon, 14 Jul 2003 19:39:58 -0700
@@ -120,7 +120,7 @@ icecast2 (0.00.cvs030529-0.1) unstable; urgency=low
 
 icecast2 (0.00.cvs030403-0.2) unstable; urgency=low
 
-  * Tried to make the default configuration more understandable. 
+  * Tried to make the default configuration more understandable.
 
  -- Keegan Quinn <ice@thebasement.org>  Fri,  4 Apr 2003 10:55:27 -0800
 

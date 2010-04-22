@@ -3,7 +3,7 @@
  * This program is distributed under the GNU General Public License, version 2.
  * A copy of this license is included with this source.
  *
- * Copyright 2000-2004, Jack Moffitt <jack@xiph.org, 
+ * Copyright 2000-2004, Jack Moffitt <jack@xiph.org,
  *                      Michael Smith <msmith@xiph.org>,
  *                      oddsock <oddsock@xiph.org>,
  *                      Karl Heyes <karl@xiph.org>
@@ -26,7 +26,7 @@ extern int playlistlog;
 ** it takes.  it turns out most other copmilers don't have support for
 ** varargs macros.  that totally sucks, but this is still pretty easy.
 **
-** feel free to add more here if needed. 
+** feel free to add more here if needed.
 */
 
 #ifdef _WIN32
@@ -75,16 +75,16 @@ extern int playlistlog;
 ** REFERER = the refering URL
 ** AGENT = the user agent
 **
-** for icecast, we add on extra field at the end, which will be 
+** for icecast, we add on extra field at the end, which will be
 ** ignored by normal log parsers
 **
 ** TIME = seconds that the connection lasted
-** 
+**
 ** this allows you to get bitrates (BYTES / TIME)
 ** and figure out exact times of connections
 **
 ** it should be noted also that events are sent on client disconnect,
-** so the DATE is the timestamp of disconnection.  DATE - TIME is the 
+** so the DATE is the timestamp of disconnection.  DATE - TIME is the
 ** time of connection.
 */
 

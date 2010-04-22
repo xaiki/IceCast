@@ -3,7 +3,7 @@
  * This program is distributed under the GNU General Public License, version 2.
  * A copy of this license is included with this source.
  *
- * Copyright 2000-2004, Jack Moffitt <jack@xiph.org, 
+ * Copyright 2000-2004, Jack Moffitt <jack@xiph.org,
  *                      Michael Smith <msmith@xiph.org>,
  *                      oddsock <oddsock@xiph.org>,
  *                      Karl Heyes <karl@xiph.org>
@@ -26,7 +26,7 @@ typedef struct source_tag
     connection_t *con;
     http_parser_t *parser;
     time_t client_stats_update;
-    
+
     char *mount;
 
     /* If this source drops, try to move all clients to this fallback */
@@ -60,7 +60,7 @@ typedef struct source_tag
 
     /* per source burst handling for connecting clients */
     unsigned int burst_size;    /* trigger level for burst on connect */
-    unsigned int burst_offset; 
+    unsigned int burst_offset;
     refbuf_t *burst_point;
 
     unsigned int queue_size;

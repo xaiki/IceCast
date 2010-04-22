@@ -3,7 +3,7 @@
  * This program is distributed under the GNU General Public License, version 2.
  * A copy of this license is included with this source.
  *
- * Copyright 2000-2004, Jack Moffitt <jack@xiph.org, 
+ * Copyright 2000-2004, Jack Moffitt <jack@xiph.org,
  *                      Michael Smith <msmith@xiph.org>,
  *                      oddsock <oddsock@xiph.org>,
  *                      Karl Heyes <karl@xiph.org>
@@ -65,7 +65,7 @@ int format_advance_queue (struct source_tag *source, client_t *client);
 int format_check_http_buffer (struct source_tag *source, client_t *client);
 int format_check_file_buffer (struct source_tag *source, client_t *client);
 
-void format_send_general_headers(format_plugin_t *format, 
+void format_send_general_headers(format_plugin_t *format,
         struct source_tag *source, client_t *client);
 
 #endif  /* __FORMAT_H__ */
