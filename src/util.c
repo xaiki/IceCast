@@ -142,9 +142,18 @@ int util_read_header(connection_t *con, refbuf_t *refbuf, int flags)
         return -ENOENT;
     }
 
-    config = config_get_config();
-    header_timeout = config->header_timeout*1000;
-    config_release_config();
+    if (con->con_timeout == 0) {
+        DEBUG ("NO TIMEOUT");
+        config = config_get_config();
+        header_timeout = config->header_timeout*1000;
+        config_release_config();
+    } else if (time(NULL) < con->con_timeout) {
+        DEBUG ("STILL HAVE TIME (%d - %d = %d)", time(NULL), con->con_timeout, con->con_timeout - time(NULL));
+        header_timeout = 1000;
+    } else {
+        DEBUG ("HUM BROKEN PIPE");
+        return -EPIPE;
+    }
 
     if (util_timed_wait_for_fd(con->sock, header_timeout) <= 0) {
 	    INFO("util_timed_wait_for_fd <= 0");
@@ -198,8 +207,18 @@ int util_read_header(connection_t *con, refbuf_t *refbuf, int flags)
             refbuf->sync_point = -pos;
 		    return -EAGAIN;
 	    }
+
+        if (time(NULL) > con->con_timeout)
+            goto out_FAIL;
     }
 
+    if (time(NULL) < con->con_timeout) {
+        DEBUG ("STILL HAVE TIME pos == (%d)…bytes = %d", pos, bytes);
+        DEBUG ("OUT, %p, refbuf->len = %d, refbuf->syncpoint = %d", refbuf, refbuf->len, refbuf->sync_point);
+        return -EAGAIN;
+    }
+
+out_FAIL:
     WARN("Couldn't find enough data, pos = %d, data = %s, entire = %d.\n", pos, refbuf->data, flags);
     refbuf->sync_point = 0;
     return -ENOENT;
