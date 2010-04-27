@@ -84,6 +84,7 @@
 
 typedef struct connection_queue_tag {
     connection_t *con;
+    refbuf_t *refbuf;
     struct connection_queue_tag *next;
 } connection_queue_t;
 
@@ -115,7 +116,7 @@ rwlock_t _source_shutdown_rwlock;
 
 static void _handle_shoutcast_compatible (int shoutcast, char *shoutcast_mount);
 static int _handle_client (client_t *client);
-static int _connection_process (connection_t *con, int timeout);
+static int _connection_process (connection_queue_t *node);
 static void *_connection_thread (void *arg);
 
 static int compare_ip (void *arg, void *a, void *b)
@@ -633,7 +634,7 @@ static void *_connection_thread (void *arg)
         if (!node) {
             continue;
         }
-        err = _connection_process (node->con, 3000);
+        err = _connection_process (node);
         if (err == -EAGAIN) { /* EAGAIN, put it again at the end of the queue */
             _add_connection (node);
         } else { /* OK or Recoverable ERR */
@@ -655,18 +656,20 @@ static void *_connection_thread (void *arg)
     return NULL;
 }
 
-static int _connection_process (connection_t *con, int timeout) {
+static int _connection_process (connection_queue_t *node) {
     ice_config_t *config;
     client_t *client = NULL;
     listener_t *listener;
-    refbuf_t *header = NULL;
+    refbuf_t *header;
     http_parser_t *parser = NULL;
     int hdrsize = 0;
     int shoutcast = 0;
     char *shoutcast_mount = NULL;
 
-    header = refbuf_new (PER_CLIENT_REFBUF_SIZE);
-    hdrsize = util_read_header (con, header, HEADER_READ_ENTIRE);
+    if (!node->refbuf)
+	    node->refbuf = refbuf_new (PER_CLIENT_REFBUF_SIZE);
+    header = node->refbuf;
+    hdrsize = util_read_header (node->con, header, HEADER_READ_ENTIRE);
     if (hdrsize < 0)
     {
         global_unlock();
@@ -693,7 +696,7 @@ static int _connection_process (connection_t *con, int timeout) {
 
     if (header->sync_point && (parser->req_type == httpp_req_source ||
                                parser->req_type == httpp_req_post)) {
-	    hdrsize = util_read_header (con, header, HEADER_READ_ENTIRE);
+	    hdrsize = util_read_header (node->con, header, HEADER_READ_ENTIRE);
 	    if (hdrsize < 0) {
             INFO ("Header read failed");
             return hdrsize;
@@ -701,7 +704,7 @@ static int _connection_process (connection_t *con, int timeout) {
     }
 
     global_lock();
-    if (client_create (&client, con, parser) < 0)
+    if (client_create (&client, node->con, parser) < 0)
     {
         global_unlock();
         client_send_403 (client, "Icecast connection limit reached");
@@ -738,8 +741,12 @@ static int _connection_process (connection_t *con, int timeout) {
     global_unlock();
     config_release_config();
 
-    if (client->con->con_time + timeout <= time(NULL))
+/* XXX(xaiki): this should be 1, but actually, it's buggy, the client is already up and all.. */
+    if (client->con->con_timeout <= time(NULL)) {
+        WARN("there might be a bug if you see this");
+        client_destroy (client);
         return -1;
+    }
 
     stats_event_inc (NULL, "connections");
 
@@ -771,6 +778,8 @@ void connection_accept_loop (void)
             duration = 300; /* use longer timeouts when nothing waiting */
             continue;
         }
+
+        con->con_timeout = time(NULL) + timeout;
 
         /* add connection async to the connection queue, then the
          * connection loop will do all the dirty work */

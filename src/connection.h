@@ -34,6 +34,7 @@ typedef struct connection_tag
     unsigned long id;
 
     time_t con_time;
+    time_t con_timeout;
     time_t discon_time;
     uint64_t sent_bytes;
 
