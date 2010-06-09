@@ -563,7 +563,7 @@ static connection_t *_accept_connection(int duration)
     return NULL;
 }
 
-connection_queue_t *_connection_new (connection_t *con)
+connection_queue_t *_connection_node_new (connection_t *con)
 {
     connection_queue_t *node;
     if (!con)
@@ -613,7 +613,7 @@ static connection_queue_t *_get_connection(void)
     return node;
 }
 
-static void destroy_node (connection_queue_t *node) {
+static void _connection_node_destroy (connection_queue_t *node) {
     INFO("destroying node");
 
     if (node->client)
@@ -647,7 +647,7 @@ static void *_connection_thread (void *arg)
         } else { /* OK or Recoverable ERR */
             if (err < 0) {
                 ERROR ("droping node, error = %d", err);
-                destroy_node (node);
+                _connection_node_destroy (node);
                 continue;
             }
             free(node);
@@ -656,7 +656,7 @@ static void *_connection_thread (void *arg)
 
     while (_con_queue) {
         node = _get_connection();
-        destroy_node (node);
+        _connection_node_destroy (node);
     }
 
     INFO0 ("Connection thread shutdown complete");
@@ -820,7 +820,7 @@ void connection_accept_loop (void)
 
         /* add connection async to the connection queue, then the
          * connection loop will do all the dirty work */
-        node =_connection_new (con);
+        node =_connection_node_new (con);
         _add_connection (node);
         duration = 3000;
     }
