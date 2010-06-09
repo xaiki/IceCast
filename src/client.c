@@ -62,7 +62,8 @@ int client_create (client_t **c_ptr, connection_t *con, http_parser_t *parser)
 
     global.clients++;
     if (config->client_limit < global.clients)
-        WARN2 ("server client limit reached (%d/%d)", config->client_limit, global.clients);
+	    WARN3 ("server client limit reached (%d/%d), client %p will fail",
+               config->client_limit, global.clients, client);
     else
         ret = 0;
 
