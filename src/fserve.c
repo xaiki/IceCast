@@ -645,7 +645,7 @@ int fserve_add_client (client_t *client, FILE *file)
 {
     fserve_t *fclient = calloc (1, sizeof(fserve_t));
 
-    DEBUG0 ("Adding client to file serving engine");
+    DEBUG1 ("Adding client %p to file serving engine", client);
     if (fclient == NULL)
     {
         client_send_404 (client, "memory exhausted");
@@ -667,7 +667,7 @@ void fserve_add_client_callback (client_t *client, fserve_callback_t callback, v
 {
     fserve_t *fclient = calloc (1, sizeof(fserve_t));
 
-    DEBUG0 ("Adding client to file serving engine");
+    DEBUG1 ("Adding client %p to file serving engine", client);
     if (fclient == NULL)
     {
         client_send_404 (client, "memory exhausted");
