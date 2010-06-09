@@ -642,15 +642,22 @@ static void *_connection_thread (void *arg)
             continue;
         }
         err = _connection_process (node);
-        if (err == -EAGAIN) { /* EAGAIN, put it again at the end of the queue */
-            _add_connection (node);
-        } else { /* OK or Recoverable ERR */
-            if (err < 0) {
-                ERROR ("droping node, error = %d", err);
-                _connection_node_destroy (node);
-                continue;
-            }
+        if (err > 0) {
             free(node);
+            continue;
+        }
+
+        switch (-err) {
+        case EAGAIN:     /* put it again at the end of the queue */
+            _add_connection (node);
+            break;
+        case EINPROGRESS:	/* already handled */
+            free(node);
+            break;
+        default:
+            ERROR ("droping node (%p, client => %p), error = %d", node, node->client, err);
+            _connection_node_destroy (node);
+            break;
         }
     }
 
@@ -669,6 +676,7 @@ static int connection_client_setup (connection_queue_t *node) {
     global_lock();
     err = client_create (&node->client, node->con, node->parser);
     if (err < 0) {
+        err = -EINPROGRESS;
         client_send_403 (node->client, "Icecast connection limit reached");
         /* don't be too eager as this is an imposed hard limit */
         goto out_fail;
@@ -867,7 +875,7 @@ int connection_complete_source (source_t *source, int response)
                     source->client = NULL;
                 }
                 WARN1("Content-type \"%s\" not supported, dropping source", contenttype);
-                return -1;
+                return -EINPROGRESS;
             }
         }
         else
