@@ -1257,7 +1257,7 @@ static int _handle_shoutcast_stage1 (connection_queue_t *node, char *shoutcast_m
  * then leave to header timeout */
     sock_write (node->con->sock, "OK2\r\nicy-caps:11\r\n\r\n");
 
-    WARN ("OK2\r\nicy-caps:11\r\n\r\n");
+    WARN ("writting to client: OK2\r\nicy-caps:11\r\n\r\n");
 
     refbuf->sync_point = snprintf (refbuf->data, refbuf->len, "POST %s HTTP/1.0\r\n", shoutcast_mount);
 
