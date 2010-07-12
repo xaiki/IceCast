@@ -143,15 +143,15 @@ int util_read_header(connection_t *con, refbuf_t *refbuf, int flags)
     }
 
     if (con->con_timeout == 0) {
-        DEBUG ("NO TIMEOUT");
+        DEBUG0 ("NO TIMEOUT");
         config = config_get_config();
         header_timeout = config->header_timeout*1000;
         config_release_config();
     } else if (time(NULL) < con->con_timeout) {
-        DEBUG ("STILL HAVE TIME (%d - %d = %d)", time(NULL), con->con_timeout, con->con_timeout - time(NULL));
+        DEBUG3 ("STILL HAVE TIME (%d - %d = %d)", time(NULL), con->con_timeout, con->con_timeout - time(NULL));
         header_timeout = 1000;
     } else {
-        DEBUG ("HUM BROKEN PIPE");
+        DEBUG0 ("HUM BROKEN PIPE");
         return -EPIPE;
     }
 
@@ -161,19 +161,19 @@ int util_read_header(connection_t *con, refbuf_t *refbuf, int flags)
     }
 
     if (refbuf->sync_point < 0) {
-        DEBUG ("REENTRING, got and old non-resolved sync");
+        DEBUG0 ("REENTRING, got and old non-resolved sync");
         pos = -refbuf->sync_point;
     } else if (refbuf->sync_point > 0) {
-        DEBUG ("REENTRING, got and old resolved sync");
+        DEBUG0 ("REENTRING, got and old resolved sync");
         endpos = pos = refbuf->sync_point;
     } else {
-        DEBUG ("FIRST TIME, no sync");
+        DEBUG0 ("FIRST TIME, no sync");
         pos = 0;
     }
 
     while ((bytes = sock_read_bytes (con->sock, refbuf->data + pos, refbuf->len - pos)) > 0) {
-        DEBUG("read %d, %d '%s'\nfrom pos '%s'", bytes, endpos, refbuf->data, refbuf->data + pos);
-	/* this is used for re-entrance, so we get a new chance to read */
+        DEBUG4 ("read %d, %d '%s'\nfrom pos '%s'", bytes, endpos, refbuf->data, refbuf->data + pos);
+        /* this is used for re-entrance, so we get a new chance to read */
         if (endpos == -ENOENT)
             endpos = util_find_eos_delim (refbuf, -(bytes + pos), flags);
         if (endpos != -ENOENT) {
@@ -214,8 +214,8 @@ int util_read_header(connection_t *con, refbuf_t *refbuf, int flags)
     }
 
     if (time(NULL) < con->con_timeout) {
-        DEBUG ("STILL HAVE TIME pos == (%d)…bytes = %d", pos, bytes);
-        DEBUG ("OUT, %p, refbuf->len = %d, refbuf->syncpoint = %d", refbuf, refbuf->len, refbuf->sync_point);
+        DEBUG3 ("STILL HAVE TIME pos == (%d)…bytes = %d… data is %s", pos, bytes, refbuf->data);
+        DEBUG3 ("OUT, %p, refbuf->len = %d, refbuf->syncpoint = %d", refbuf, refbuf->len, refbuf->sync_point);
         return -EAGAIN;
     }
 
