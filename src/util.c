@@ -171,14 +171,7 @@ int util_read_header(connection_t *con, refbuf_t *refbuf, int flags)
         pos = 0;
     }
 
-    while ((bytes = sock_read_bytes (con->sock, refbuf->data + pos, refbuf->len - pos)) >= 0) {
-        if (bytes == 0)
-            break;
-        if (bytes == -1) {
-            con->error = 1;
-            goto out_FAIL;
-        }
-
+    while ((bytes = sock_read_bytes (con->sock, refbuf->data + pos, refbuf->len - pos)) > 0) {
         DEBUG("read %d, %d '%s'\nfrom pos '%s'", bytes, endpos, refbuf->data, refbuf->data + pos);
 	/* this is used for re-entrance, so we get a new chance to read */
         if (endpos == -ENOENT)
@@ -212,6 +205,12 @@ int util_read_header(connection_t *con, refbuf_t *refbuf, int flags)
 
         if (time(NULL) > con->con_timeout)
             goto out_FAIL;
+    }
+
+    if (bytes == 0 || ! sock_recoverable (sock_error())) {
+        WARN ("Connection error");
+        con->error = 1;
+        return -EPIPE;
     }
 
     if (time(NULL) < con->con_timeout) {
