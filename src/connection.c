@@ -777,6 +777,7 @@ static int _connection_process (connection_queue_t *node) {
         return -EINVAL;
     }
 
+    /* XXX what happens when error in http ??? is err set ? */
     if (httpp_getvar (parser, HTTPP_VAR_ERROR_MESSAGE)) {
         ERROR("Error(%s)", httpp_getvar(parser, HTTPP_VAR_ERROR_MESSAGE));
         return err;
