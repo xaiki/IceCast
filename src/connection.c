@@ -1252,7 +1252,7 @@ static int _handle_shoutcast_stage1 (connection_queue_t *node, char *shoutcast_m
     }
 
     if (memmem (refbuf->data, passlen, source_password, strlen(source_password)) == NULL) {
-        INFO ("password does not match (%d) \"%s\" (%d) \"%s\"",
+        INFO ("password does not match (%ld) \"%s\" (%d) \"%s\"",
               strlen(source_password), source_password, passlen, refbuf->data);
         err = -ENOENT;
         goto out_FAIL;
