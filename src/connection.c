@@ -616,14 +616,19 @@ static connection_queue_t *_get_connection(void)
 static void _connection_node_destroy (connection_queue_t *node) {
     INFO("destroying node");
 
-    if (node->con)
-        connection_close(node->con);
-    if (node->client)
-        client_destroy(node->client);
-    if (node->parser)
-        httpp_destroy(node->parser);
-    if (node->refbuf)
-        refbuf_release(node->refbuf);
+    if (node->client) {
+        client_destroy(node->client); /* destroys con, parser, refbuf */
+    } else {
+        if (node->parser) {
+            httpp_destroy(node->parser);
+        }
+        if (node->refbuf) {
+            refbuf_release(node->refbuf);
+        }
+        if (node->con) {
+            connection_close(node->con);
+        }
+    }
     free(node);
 }
 
