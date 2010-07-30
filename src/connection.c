@@ -538,28 +538,27 @@ static connection_t *_accept_connection(int duration)
     ip = (char *)malloc(MAX_ADDR_LEN);
 
     sock = sock_accept(serversock, ip, MAX_ADDR_LEN);
-    if (sock != SOCK_ERROR)
-    {
-        connection_t *con = NULL;
-        /* Make any IPv4 mapped IPv6 address look like a normal IPv4 address */
-        if (strncmp (ip, "::ffff:", 7) == 0)
-            memmove (ip, ip+7, strlen (ip+7)+1);
+    if (sock == SOCK_ERROR) {
+        free (ip);
+        if (sock_recoverable(sock_error()))
+            return NULL;
 
-        if (accept_ip_address (ip)) {
-            con = connection_create (sock, serversock, ip);
-            if (con)
-                return con;
-        }
-        sock_close (sock);
+        WARN2("accept() failed with error %d: %s", sock_error(), strerror(sock_error()));
+        thread_sleep (500000);
+        return NULL;
     }
-    else
-    {
-        if (!sock_recoverable(sock_error()))
-        {
-            WARN2("accept() failed with error %d: %s", sock_error(), strerror(sock_error()));
-            thread_sleep (500000);
-        }
+
+    connection_t *con = NULL;
+    /* Make any IPv4 mapped IPv6 address look like a normal IPv4 address */
+    if (strncmp (ip, "::ffff:", 7) == 0)
+        memmove (ip, ip+7, strlen (ip+7)+1);
+
+    if (accept_ip_address (ip)) {
+        con = connection_create (sock, serversock, ip);
+        if (con)
+            return con;
     }
+    sock_close (sock);
     free(ip);
     return NULL;
 }
