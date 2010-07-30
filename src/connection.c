@@ -1273,17 +1273,15 @@ static int _handle_client (client_t *client)
 
     if (strcmp("ICE",  httpp_getvar(parser, HTTPP_VAR_PROTOCOL)) &&
         strcmp("HTTP", httpp_getvar(parser, HTTPP_VAR_PROTOCOL))) {
-        ERROR0("Bad HTTP protocol detected");
-        client_destroy (client);
-        return 0;
+        client_send_400 (client, "Bad HTTP protocol");
+        return -EINPROGRESS;
     }
 
     uri = util_normalise_uri(rawuri);
 
-    if (uri == NULL)
-    {
-        client_destroy (client);
-        return 0;
+    if (uri == NULL) {
+        client_send_400 (client, "Couldn't normalize uri");
+        return -EINPROGRESS;
     }
 
     if (parser->req_type == httpp_req_source) {
@@ -1299,8 +1297,8 @@ static int _handle_client (client_t *client)
         _handle_get_request (client, uri);
     }
     else {
-        ERROR0("Wrong request type from client");
-        client_send_400 (client, "unknown request");
+        client_send_400 (client, "Wrong request type from client");
+        return -EINPROGRESS;
     }
 
     free(uri);
