@@ -182,6 +182,7 @@ int client_read_bytes (client_t *client, void *buf, unsigned len)
 
 
 void client_send_400(client_t *client, char *message) {
+    ERROR("400 -> %s", message);
     snprintf (client->refbuf->data, PER_CLIENT_REFBUF_SIZE,
             "HTTP/1.0 400 Bad Request\r\n"
             "Content-Type: text/html\r\n\r\n"
