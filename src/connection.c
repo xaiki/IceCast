@@ -674,25 +674,20 @@ static int connection_client_setup (connection_queue_t *node) {
         goto out_fail;
     }
 
-    err = -EINVAL;
     if (sock_set_blocking (node->con->sock, 0) || sock_set_nodelay (node->con->sock)) {
-        WARN0 ("failed to set tcp options on client connection, dropping");
-        goto out_destroy_client;
+        if (! sock_recoverable(sock_error())) {
+            node->con->error = 1;
+            err = -EINVAL;
+            goto out_fail;
+        }
+        err = -EINPROGRESS;
+        client_send_403 (node->client, "failed to set tcp options on client connection, dropping");
+        goto out_fail;
     }
-
-/* XXX(xaiki): this should be 1, but actually, it's buggy, the client is already up and all.. */
-    err = -ENOENT;
-    if (node->con->con_timeout <= time(NULL)) {
-        WARN("there might be a bug if you see this");
-        goto out_destroy_client;
-    }
-
     global_unlock();
 
     return 0;
 
-out_destroy_client:
-    client_destroy (node->client);
 out_fail:
     global_unlock();
     return err;
