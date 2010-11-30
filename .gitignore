@@ -1,0 +1,14 @@
+.deps
+.libs
+Makefile
+Makefile.in
+*.o
+*.dist
+config.*
+*.la
+*.lo
+stamp*
+libtool
+ltmain.sh
+autom4te*
+cscope*
