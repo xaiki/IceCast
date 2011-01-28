@@ -179,14 +179,9 @@ int util_read_header(connection_t *con, refbuf_t *refbuf, int flags)
         if (endpos != -ENOENT) {
             INFO("found it, read %d, left for you: %d, starting %s",
                  pos + bytes, pos + bytes - endpos, refbuf->data);
-            if (pos + bytes - endpos > 0) {
-                refbuf->len = pos + bytes;
-                INFO("ok got everything");
-                refbuf->sync_point = 0;
-                return endpos;
-            }
-            INFO ("missing client data, come back for more");
-            refbuf->sync_point = endpos;
+            refbuf->len = pos + bytes;
+            INFO("ok got everything");
+            refbuf->sync_point = 0;
             return endpos;
         }
 
