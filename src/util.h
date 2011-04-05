@@ -16,13 +16,16 @@
 #define XSLT_CONTENT 1
 #define HTML_CONTENT 2
 
-#define HEADER_READ_ENTIRE 0
-#define HEADER_READ_LINE 1
+enum header_read_flags{
+       HEADER_READ_ENTIRE = 0,
+       HEADER_READ_LINE,
+};
 
 #define MAX_LINE_LEN 512
 
 int util_timed_wait_for_fd(sock_t fd, int timeout);
-int util_find_eos_delim(refbuf_t *refbuf, int offset, int flags);
+int _util_find_eos_delim(char *data, int len, enum header_read_flags flags);
+int util_find_eos_delim(refbuf_t *refbuf, int offset, enum header_read_flags flags);
 int util_read_header(connection_t *con, refbuf_t *refbuf, int flags);
 int util_check_valid_extension(const char *uri);
 char *util_get_extension(const char *path);
