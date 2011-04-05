@@ -33,6 +33,7 @@
 #include "format.h"
 #include "stats.h"
 #include "fserve.h"
+#include "util.h"
 
 #include "client.h"
 #include "logging.h"
@@ -71,9 +72,13 @@ int client_create (client_t **c_ptr, connection_t *con, http_parser_t *parser)
     *c_ptr = client;
 
     if (transferenc && (! strcmp ("chunked", transferenc))) {
-        client_send_403 (client, "Transfer-Encoding: chunked not supported");
-        return -EINPROGRESS;
+        client->chunksize = 0;
+    } else {
+        client->chunksize = -1;
     }
+
+	WARN("<xaiki> Created client client: %p. con=%p, fd=%d, chunked=%d, %s",
+         client, con, con->sock, client->chunksize, transferenc);
 
     config = config_get_config ();
     global.clients++;
@@ -161,32 +166,98 @@ int client_check_source_auth (client_t *client, const char *mount)
     return ret;
 }
 
+static int client_getc(client_t *client) {
+    refbuf_t *refbuf = client->refbuf;
+	int len;
+	char b;
+
+	if (client->refbuf && client->refbuf->len < client->refbuf->sync_point)
+		return *(refbuf->data + refbuf->sync_point++);
+	len = client->con->read (client->con, &b, 1);
+
+    if (len <= 0)
+        return -EIO;
+    if (len == 0)
+        return -1;
+
+    return b;
+}
+
+static int client_get_line(client_t *client, char *line, int line_size) {
+    int ch;
+    char *q;
+
+    q = line;
+    for(;;) {
+        ch = client_getc(client);
+        if (ch < 0)
+            return -1;
+        if (ch == '\n') {
+            /* process line */
+            if (q > line && q[-1] == '\r')
+                q--;
+            *q = '\0';
+
+            return 0;
+        } else {
+            if ((q - line) < line_size - 1)
+                *q++ = ch;
+        }
+    }
+}
 
 /* helper function for reading data from a client */
-int client_read_bytes (client_t *client, void *buf, unsigned len)
+int client_read_bytes (client_t *client, void *buf, int len)
 {
-    int bytes;
+    refbuf_t *refbuf = client->refbuf;
+
+    if (client->chunksize >= 0) {
+	    if (!client->chunksize) {
+		    char line[32];
+
+			for(;;) {
+				do {
+					if (client_get_line(client, line, sizeof(line)) < 0)
+						return -1;
+
+                } while (!*line);    /* skip CR LF from last chunk */
+
+                client->chunksize = strtoll(line, NULL, 16);
+
+                DEBUG ("Chunked encoding data size: %d (%x)\n", client->chunksize, client->chunksize);
+
+                if (!client->chunksize)
+                    return 0;
+                break;
+            }
+        }
+        len = MIN(len, client->chunksize);
+    }
 
     if (client->refbuf && client->refbuf->len)
     {
         /* we have data to read from a refbuf first */
-        if (client->refbuf->len < len)
-            len = client->refbuf->len;
-        memcpy (buf, client->refbuf->data, len);
-        if (len < client->refbuf->len)
+        if (refbuf->len - refbuf->sync_point < len)
+            len = refbuf->len - refbuf->sync_point;
+        memcpy (buf, refbuf->data + refbuf->sync_point, len);
+        if (len < refbuf->len - refbuf->sync_point)
         {
-            char *ptr = client->refbuf->data;
-            memmove (ptr, ptr+len, client->refbuf->len - len);
+            char *ptr = client->refbuf->data + refbuf->sync_point;
+            memmove (ptr, ptr+len, client->refbuf->len - refbuf->sync_point - len);
         }
-        client->refbuf->len -= len;
-        return len;
+        refbuf->len -= len;
+    } else {
+        len = client->con->read (client->con, buf, len);
     }
-    bytes = client->con->read (client->con, buf, len);
 
-    if (bytes == -1 && client->con->error)
-        DEBUG0 ("reading from connection has failed");
-
-    return bytes;
+    if (len <= 0) {
+        if (len == -1 && client->con->error)
+            DEBUG0 ("reading from connection has failed");
+    } else  {
+        if (client->chunksize > 0)
+            client->chunksize -= len;
+    }
+    return len;
 }
 
 
