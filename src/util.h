@@ -23,6 +23,9 @@ enum header_read_flags{
 
 #define MAX_LINE_LEN 512
 
+#define MIN(X,Y) ((X)<(Y))?(X):(Y)
+#define MAX(X,Y) ((X)>(Y))?(X):(Y)
+
 int util_timed_wait_for_fd(sock_t fd, int timeout);
 int _util_find_eos_delim(char *data, int len, enum header_read_flags flags);
 int util_find_eos_delim(refbuf_t *refbuf, int offset, enum header_read_flags flags);

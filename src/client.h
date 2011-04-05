@@ -3,7 +3,7 @@
  * This program is distributed under the GNU General Public License, version 2.
  * A copy of this license is included with this source.
  *
- * Copyright 2000-2004, Jack Moffitt <jack@xiph.org, 
+ * Copyright 2000-2004, Jack Moffitt <jack@xiph.org,
  *                      Michael Smith <msmith@xiph.org>,
  *                      oddsock <oddsock@xiph.org>,
  *                      Karl Heyes <karl@xiph.org>
@@ -44,6 +44,9 @@ typedef struct _client_tag
     /* position in first buffer */
     unsigned int pos;
 
+    /* Size of current chunk, -1 if disabled */
+    int chunksize;
+
     /* auth used for this client */
     struct auth_tag *auth;
 
@@ -75,7 +78,7 @@ void client_send_401(client_t *client);
 void client_send_403(client_t *client, const char *reason);
 void client_send_400(client_t *client, char *message);
 int client_send_bytes (client_t *client, const void *buf, unsigned len);
-int client_read_bytes (client_t *client, void *buf, unsigned len);
+int client_read_bytes (client_t *client, void *buf, int len);
 void client_set_queue (client_t *client, refbuf_t *refbuf);
 int client_check_source_auth (client_t *client, const char *mount);
 
