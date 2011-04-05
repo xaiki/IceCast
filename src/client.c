@@ -233,6 +233,7 @@ void client_send_403(client_t *client, const char *reason)
     client->respcode = 403;
     client->refbuf->len = strlen (client->refbuf->data);
     fserve_add_client (client, NULL);
+    DEBUG ("Sending 403: %s", reason);
 }
 
 
