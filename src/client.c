@@ -53,30 +53,38 @@ int client_create (client_t **c_ptr, connection_t *con, http_parser_t *parser)
 {
     ice_config_t *config;
     client_t *client = (client_t *)calloc(1, sizeof(client_t));
-    int ret = -1;
+    const char *transferenc;
+    int ret = 0;
 
     if (client == NULL)
         abort();
 
-    config = config_get_config ();
+    transferenc = httpp_getvar (parser, "transfer-encoding");
 
-    global.clients++;
-    if (config->client_limit < global.clients)
-	    WARN3 ("server client limit reached (%d/%d), client %p will fail",
-               config->client_limit, global.clients, client);
-    else
-        ret = 0;
-
-    config_release_config ();
-
-    stats_event_args (NULL, "clients", "%d", global.clients);
     client->con = con;
     client->parser = parser;
     client->refbuf = refbuf_new (PER_CLIENT_REFBUF_SIZE);
     client->refbuf->len = 0; /* force reader code to ignore buffer contents */
     client->pos = 0;
     client->write_to_client = format_generic_write_to_client;
+
     *c_ptr = client;
+
+    if (transferenc && (! strcmp ("chunked", transferenc))) {
+        client_send_403 (client, "Transfer-Encoding: chunked not supported");
+        return -EINPROGRESS;
+    }
+
+    config = config_get_config ();
+    global.clients++;
+    if (config->client_limit < global.clients) {
+        /* don't be too eager as this is an imposed hard limit */
+        client_send_403 (client, "Icecast connection limit reached");
+        ret = -EINPROGRESS;
+    }
+
+    config_release_config ();
+    stats_event_args (NULL, "clients", "%d", global.clients);
 
     return ret;
 }
