@@ -84,51 +84,48 @@ int util_timed_wait_for_fd(sock_t fd, int timeout)
 #endif
 }
 
-int util_find_eos_delim(refbuf_t *refbuf, int offset, int flags)
+int _util_find_eos_delim(char *data, int len, enum header_read_flags flags)
 {
-    int len = refbuf->len;
-
-    if (offset < 0) {
-        len = -offset;
-        offset = 0;
-    }
-
     /* handle \n, \r\n and nsvcap which for some strange reason has
      * EOL as \r\r\n */
     char *ptr;
     switch (flags) {
     case HEADER_READ_LINE:
         /* password line */
-	    ptr = memmem (refbuf->data + offset, len - offset, "\r\r\n", 3);
+	    ptr = memmem (data, len, "\r\r\n", 3);
         if (ptr)
-            return ((ptr+3) - refbuf->data + offset);
-        ptr = memmem (refbuf->data + offset, len - offset, "\r\n", 2);
+            return ((ptr+3) - data);
+        ptr = memmem (data, len, "\r\n", 2);
         if (ptr)
-            return ((ptr+2) - refbuf->data + offset);
-        ptr = memmem (refbuf->data + offset, len - offset, "\n", 1);
+            return ((ptr+2) - data);
+        ptr = memmem (data, len, "\n", 1);
         if (ptr)
-            return ((ptr+1) - refbuf->data + offset);
+            return ((ptr+1) - data);
         break;
     case HEADER_READ_ENTIRE:
         /* stream_offset refers to the start of any data sent after the
          * http style headers, we don't want to lose those */
-        ptr = memmem (refbuf->data + offset, len - offset, "\r\r\n\r\r\n", 6);
+        ptr = memmem (data, len, "\r\r\n\r\r\n", 6);
         if (ptr)
-            return ((ptr+6) - refbuf->data + offset);
+            return ((ptr+6) - data);
 
-        ptr = memmem (refbuf->data + offset, len - offset, "\r\n\r\n", 4);
+        ptr = memmem (data, len, "\r\n\r\n", 4);
         if (ptr)
-            return ((ptr+4) - refbuf->data + offset);
+            return ((ptr+4) - data);
 
-        ptr = memmem (refbuf->data + offset, len - offset, "\n\n", 2);
+        ptr = memmem (data, len, "\n\n", 2);
         if (ptr)
-            return ((ptr+2) - refbuf->data + offset);
+            return ((ptr+2) - data);
         break;
     default:
         WARN ("Unhandled flag: %d", flags);
     }
 
     return -ENOENT;
+}
+
+int util_find_eos_delim(refbuf_t *refbuf, int offset, enum header_read_flags flags) {
+	return _util_find_eos_delim(refbuf->data + offset, refbuf->len - offset, flags);
 }
 
 int util_read_header(connection_t *con, refbuf_t *refbuf, int flags)
@@ -175,7 +172,7 @@ int util_read_header(connection_t *con, refbuf_t *refbuf, int flags)
         DEBUG4 ("read %d, %d '%s'\nfrom pos '%s'", bytes, endpos, refbuf->data, refbuf->data + pos);
         /* this is used for re-entrance, so we get a new chance to read */
         if (endpos == -ENOENT)
-            endpos = util_find_eos_delim (refbuf, -(bytes + pos), flags);
+            endpos = _util_find_eos_delim (refbuf->data, (bytes +pos), flags);
         if (endpos != -ENOENT) {
             INFO("found it, read %d, left for you: %d, starting %s",
                  pos + bytes, pos + bytes - endpos, refbuf->data);
