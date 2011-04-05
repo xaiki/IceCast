@@ -684,12 +684,8 @@ static int connection_client_setup (connection_queue_t *node) {
 
     global_lock();
     err = client_create (&node->client, node->con, node->parser);
-    if (err < 0) {
-        err = -EINPROGRESS;
-        client_send_403 (node->client, "Icecast connection limit reached");
-        /* don't be too eager as this is an imposed hard limit */
+    if (err < 0)
         goto out_fail;
-    }
 
     if (sock_set_blocking (node->con->sock, 0) || sock_set_nodelay (node->con->sock)) {
         if (! sock_recoverable(sock_error())) {
