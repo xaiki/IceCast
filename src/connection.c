@@ -415,16 +415,16 @@ connection_t *connection_create (sock_t sock, sock_t serversock, char *ip)
 {
     connection_t *con;
     con = (connection_t *)calloc(1, sizeof(connection_t));
-    if (con)
-    {
-        con->sock = sock;
-        con->serversock = serversock;
-        con->con_time = time(NULL);
-        con->id = _next_connection_id();
-        con->ip = ip;
-        con->read = connection_read;
-        con->send = connection_send;
-    }
+    if (!con)
+	    return NULL;
+
+    con->sock = sock;
+    con->serversock = serversock;
+    con->con_time = time(NULL);
+    con->id = _next_connection_id();
+    con->ip = ip;
+    con->read = connection_read;
+    con->send = connection_send;
 
     return con;
 }
