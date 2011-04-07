@@ -457,60 +457,53 @@ static refbuf_t *get_next_buffer (source_t *source)
 {
     refbuf_t *refbuf = NULL;
     int delay = 250;
+    int fds = 0;
+    time_t current = time (NULL);
 
     if (source->short_delay)
         delay = 0;
-    while (global.running == ICE_RUNNING && source->running)
-    {
-        int fds = 0;
-        time_t current = time (NULL);
+    if (global.running != ICE_RUNNING || ! source->running)
+        return NULL;
 
-        if (source->client)
-            fds = util_timed_wait_for_fd (source->con->sock, delay);
-        else
-        {
-            thread_sleep (delay*1000);
-            source->last_read = current;
-        }
-
-        if (current >= source->client_stats_update)
-        {
-            stats_event_args (source->mount, "total_bytes_read",
-                    "%"PRIu64, source->format->read_bytes);
-            stats_event_args (source->mount, "total_bytes_sent",
-                    "%"PRIu64, source->format->sent_bytes);
-            source->client_stats_update = current + 5;
-        }
-        if (fds < 0)
-        {
-            if (! sock_recoverable (sock_error()))
-            {
-                WARN0 ("Error while waiting on socket, Disconnecting source");
-                source->running = 0;
-            }
-            break;
-        }
-        if (fds == 0)
-        {
-            if (source->last_read + (time_t)source->timeout < current)
-            {
-                DEBUG3 ("last %ld, timeout %d, now %ld", (long)source->last_read,
-                        source->timeout, (long)current);
-                WARN0 ("Disconnecting source due to socket timeout");
-                source->running = 0;
-            }
-            break;
-        }
+    if (source->client) {
+        fds = util_timed_wait_for_fd (source->con->sock, delay);
+    } else {
+        thread_sleep (delay*1000);
         source->last_read = current;
-        refbuf = source->format->get_buffer (source);
-        if (source->client->con && source->client->con->error)
-        {
+    }
+
+    if (current >= source->client_stats_update) {
+        stats_event_args (source->mount, "total_bytes_read",
+                          "%"PRIu64, source->format->read_bytes);
+        stats_event_args (source->mount, "total_bytes_sent",
+                          "%"PRIu64, source->format->sent_bytes);
+        source->client_stats_update = current + 5;
+    }
+    if (fds < 0) {
+        if (! sock_recoverable (sock_error())) {
+            WARN0 ("Error while waiting on socket, Disconnecting source");
+            source->running = 0;
+        }
+        return NULL;
+    }
+    if (fds == 0) {
+        if (source->last_read + (time_t)source->timeout < current) {
+            DEBUG3 ("last %ld, timeout %d, now %ld", (long)source->last_read,
+                    source->timeout, (long)current);
+            WARN0 ("Disconnecting source due to socket timeout");
+            source->running = 0;
+        }
+        return NULL;
+    }
+
+    refbuf = source->format->get_buffer (source);
+    if (refbuf) {
+        source->last_read = current;
+    } else {
+        if (source->client->con && source->client->con->error) {
             INFO1 ("End of Stream %s", source->mount);
             source->running = 0;
-            continue;
         }
-        if (refbuf)
-            break;
     }
 
     return refbuf;
