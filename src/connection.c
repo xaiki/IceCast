@@ -673,6 +673,10 @@ static void *_connection_thread (void *arg)
 static int connection_client_setup (connection_queue_t *node) {
     int err;
 
+    err = -ENOENT;
+    if (node->con->con_timeout <= time(NULL))
+        return err;
+
     global_lock();
     err = client_create (&node->client, node->con, node->parser);
     if (err < 0) {
