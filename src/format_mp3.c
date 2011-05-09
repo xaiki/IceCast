@@ -35,6 +35,7 @@
 #include "stats.h"
 #include "format.h"
 #include "httpp/httpp.h"
+#include "amalloc.h"
 
 #include "logging.h"
 
@@ -77,10 +78,10 @@ int format_mp3_get_plugin (source_t *source)
 {
     const char *metadata;
     format_plugin_t *plugin;
-    mp3_state *state = calloc(1, sizeof(mp3_state));
+    mp3_state *state = acalloc(1, sizeof(mp3_state));
     refbuf_t *meta;
 
-    plugin = (format_plugin_t *)calloc(1, sizeof(format_plugin_t));
+    plugin = (format_plugin_t *)acalloc(1, sizeof(format_plugin_t));
 
     plugin->type = FORMAT_TYPE_GENERIC;
     plugin->get_buffer = mp3_get_no_meta;
@@ -182,15 +183,12 @@ static void filter_shoutcast_metadata (source_t *source, char *metadata, unsigne
             if ((end = strstr (metadata+13, "\';")) == NULL)
                 break;
             len = (end - metadata) - 13;
-            p = calloc (1, len+1);
-            if (p)
-            {
+            p = acalloc (1, len+1);
                 memcpy (p, metadata+13, len);
                 logging_playlist (source->mount, p, source->listeners);
                 stats_event_conv (source->mount, "title", p, source->format->charset);
                 yp_touch (source->mount);
                 free (p);
-            }
         } while (0);
     }
 }
@@ -657,7 +655,7 @@ static refbuf_t *mp3_get_filter_meta (source_t *source)
 
 static int format_mp3_create_client_data(source_t *source, client_t *client)
 {
-    mp3_client_data *client_mp3 = calloc(1,sizeof(mp3_client_data));
+    mp3_client_data *client_mp3 = acalloc(1,sizeof(mp3_client_data));
     mp3_state *source_mp3 = source->format->_state;
     const char *metadata;
     /* the +-2 is for overwriting the last set of \r\n */

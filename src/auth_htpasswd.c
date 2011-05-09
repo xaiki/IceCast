@@ -31,6 +31,7 @@
 #include "cfgfile.h"
 #include "httpp/httpp.h"
 #include "md5.h"
+#include "amalloc.h"
 
 #include "logging.h"
 #define CATMODULE "auth_htpasswd"
@@ -158,9 +159,9 @@ static void htpasswd_recheckfile (htpasswd_auth_state *htpasswd)
             WARN2("No separator on line %d (%s)", num, htpasswd->filename);
             continue;
         }
-        entry = calloc (1, sizeof (htpasswd_user));
+        entry = acalloc (1, sizeof (htpasswd_user));
         len = strlen (line) + 1;
-        entry->name = malloc (len);
+        entry->name = amalloc (len);
         *sep = 0;
         memcpy (entry->name, line, len);
         entry->pass = entry->name + (sep-line) + 1;
@@ -228,7 +229,7 @@ int  auth_get_htpasswd_auth (auth_t *authenticator, config_options_t *options)
     authenticator->deleteuser = htpasswd_deleteuser;
     authenticator->listuser = htpasswd_userlist;
 
-    state = calloc(1, sizeof(htpasswd_auth_state));
+    state = acalloc(1, sizeof(htpasswd_auth_state));
 
     while(options) {
         if(!strcmp(options->name, "filename"))
@@ -318,7 +319,7 @@ static auth_result htpasswd_deleteuser(auth_t *auth, const char *username)
         return AUTH_FAILED;
     }
     tmpfile_len = strlen(state->filename) + 6;
-    tmpfile = calloc(1, tmpfile_len);
+    tmpfile = acalloc(1, tmpfile_len);
     snprintf (tmpfile, tmpfile_len, "%s.tmp", state->filename);
     if (stat (tmpfile, &file_info) == 0)
     {

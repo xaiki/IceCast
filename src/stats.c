@@ -37,6 +37,7 @@
 #include "stats.h"
 #include "xslt.h"
 #include "util.h"
+#include "amalloc.h"
 #define CATMODULE "stats"
 #include "logging.h"
 
@@ -100,9 +101,7 @@ static stats_event_t *build_event (const char *source, const char *name, const c
 {
     stats_event_t *event;
 
-    event = (stats_event_t *)calloc(1, sizeof(stats_event_t));
-    if (event)
-    {
+    event = (stats_event_t *)acalloc(1, sizeof(stats_event_t));
         if (source)
             event->source = (char *)strdup(source);
         if (name)
@@ -111,7 +110,6 @@ static stats_event_t *build_event (const char *source, const char *name, const c
             event->value = (char *)strdup(value);
         else
             event->action = STATS_EVENT_REMOVE;
-    }
     return event;
 }
 
@@ -327,7 +325,7 @@ void stats_event_add(const char *source, const char *name, unsigned long value)
     /* DEBUG2("%s on %s", name, source==NULL?"global":source); */
     if (event)
     {
-        event->value = malloc (16);
+        event->value = amalloc (16);
         snprintf (event->value, 16, "%ld", value);
         event->action = STATS_EVENT_ADD;
         queue_global_event (event);
@@ -339,7 +337,7 @@ void stats_event_sub(const char *source, const char *name, unsigned long value)
     stats_event_t *event = build_event (source, name, NULL);
     if (event)
     {
-        event->value = malloc (16);
+        event->value = amalloc (16);
         snprintf (event->value, 16, "%ld", value);
         event->action = STATS_EVENT_SUB;
         queue_global_event (event);
@@ -413,7 +411,7 @@ static stats_source_t *_find_source(avl_tree *source_tree, const char *source)
 
 static stats_event_t *_copy_event(stats_event_t *event)
 {
-    stats_event_t *copy = (stats_event_t *)calloc(1, sizeof(stats_event_t));
+    stats_event_t *copy = (stats_event_t *)acalloc(1, sizeof(stats_event_t));
     if (event->source)
         copy->source = (char *)strdup(event->source);
     else
@@ -466,7 +464,7 @@ static void modify_node_event (stats_node_t *node, stats_event_t *event)
                 WARN2 ("unhandled event (%d) for %s", event->action, event->source);
                 break;
         }
-        str = malloc (16);
+        str = amalloc (16);
         snprintf (str, 16, "%" PRId64, value);
         if (event->value == NULL)
             event->value = strdup (str);
@@ -503,7 +501,7 @@ static void process_global_event (stats_event_t *event)
     else
     {
         /* add node */
-        node = (stats_node_t *)calloc(1, sizeof(stats_node_t));
+        node = (stats_node_t *)acalloc(1, sizeof(stats_node_t));
         node->name = (char *)strdup(event->name);
         node->value = (char *)strdup(event->value);
 
@@ -519,9 +517,7 @@ static void process_source_event (stats_event_t *event)
     {
         if (event->action == STATS_EVENT_REMOVE)
             return;
-        snode = (stats_source_t *)calloc(1,sizeof(stats_source_t));
-        if (snode == NULL)
-            return;
+        snode = (stats_source_t *)acalloc(1,sizeof(stats_source_t));
         DEBUG1 ("new source stat %s", event->source);
         snode->source = (char *)strdup(event->source);
         snode->stats_tree = avl_tree_new(_compare_stats, NULL);
@@ -543,7 +539,7 @@ static void process_source_event (stats_event_t *event)
             if (event->value)
             {
                 DEBUG2 ("new node %s (%s)", event->name, event->value);
-                node = (stats_node_t *)calloc(1,sizeof(stats_node_t));
+                node = (stats_node_t *)acalloc(1,sizeof(stats_node_t));
                 node->name = (char *)strdup(event->name);
                 node->value = (char *)strdup(event->value);
                 node->hidden = snode->hidden;
@@ -694,7 +690,7 @@ static void _unregister_listener(event_listener_t *listener)
 
 static stats_event_t *_make_event_from_node(stats_node_t *node, char *source)
 {
-    stats_event_t *event = (stats_event_t *)malloc(sizeof(stats_event_t));
+    stats_event_t *event = (stats_event_t *)amalloc(sizeof(stats_event_t));
 
     if (source != NULL)
         event->source = (char *)strdup(source);

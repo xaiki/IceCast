@@ -51,6 +51,7 @@
 #include "fserve.h"
 #include "auth.h"
 #include "compat.h"
+#include "amalloc.h"
 
 #undef CATMODULE
 #define CATMODULE "source"
@@ -92,9 +93,7 @@ source_t *source_reserve (const char *mount)
             break;
         }
 
-        src = calloc (1, sizeof(source_t));
-        if (src == NULL)
-            break;
+        src = acalloc (1, sizeof(source_t));
 
         src->client_tree = avl_tree_new(_compare_clients, NULL);
         src->pending_tree = avl_tree_new(_compare_clients, NULL);
@@ -591,7 +590,7 @@ static void source_init (source_t *source)
     listen_url_size = strlen("http://") + strlen(config->hostname) +
         strlen(":") + 6 + strlen(source->mount) + 1;
 
-    listenurl = malloc (listen_url_size);
+    listenurl = amalloc (listen_url_size);
     memset (listenurl, '\000', listen_url_size);
     snprintf (listenurl, listen_url_size, "http://%s:%d%s",
             config->hostname, config->port, source->mount);
@@ -1135,9 +1134,7 @@ static void source_apply_mount (source_t *source, mount_proxy *mountinfo)
         ice_config_t *config = config_get_config_unlocked ();
         unsigned int len  = strlen (config->webroot_dir) +
             strlen (mountinfo->intro_filename) + 2;
-        char *path = malloc (len);
-        if (path)
-        {
+        char *path = amalloc (len);
             FILE *f;
             snprintf (path, len, "%s" PATH_SEPARATOR "%s", config->webroot_dir,
                     mountinfo->intro_filename);
@@ -1149,7 +1146,6 @@ static void source_apply_mount (source_t *source, mount_proxy *mountinfo)
                 WARN2 ("Cannot open intro file \"%s\": %s", path, strerror(errno));
             free (path);
         }
-    }
 
     if (mountinfo && mountinfo->queue_size_limit)
         source->queue_size_limit = mountinfo->queue_size_limit;
@@ -1328,8 +1324,7 @@ static void *source_fallback_file (void *arg)
             break;
         config = config_get_config();
         len  = strlen (config->webroot_dir) + strlen (mount) + 1;
-        path = malloc (len);
-        if (path)
+        path = amalloc (len);
             snprintf (path, len, "%s%s", config->webroot_dir, mount);
 
         config_release_config ();

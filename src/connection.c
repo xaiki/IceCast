@@ -61,6 +61,7 @@
 #include "event.h"
 #include "admin.h"
 #include "auth.h"
+#include "amalloc.h"
 
 #define CATMODULE "connection"
 
@@ -402,9 +403,7 @@ static int accept_ip_address (char *ip)
 connection_t *connection_create (sock_t sock, sock_t serversock, char *ip)
 {
     connection_t *con;
-    con = (connection_t *)calloc(1, sizeof(connection_t));
-    if (con)
-    {
+    con = (connection_t *)acalloc(1, sizeof(connection_t));
         con->sock = sock;
         con->serversock = serversock;
         con->con_time = time(NULL);
@@ -412,7 +411,6 @@ connection_t *connection_create (sock_t sock, sock_t serversock, char *ip)
         con->ip = ip;
         con->read = connection_read;
         con->send = connection_send;
-    }
 
     return con;
 }
@@ -523,7 +521,7 @@ static connection_t *_accept_connection(int duration)
         return NULL;
 
     /* malloc enough room for a full IP address (including ipv6) */
-    ip = (char *)malloc(MAX_ADDR_LEN);
+    ip = (char *)amalloc(MAX_ADDR_LEN);
 
     sock = sock_accept(serversock, ip, MAX_ADDR_LEN);
     if (sock != SOCK_ERROR)
@@ -550,7 +548,6 @@ static connection_t *_accept_connection(int duration)
     free(ip);
     return NULL;
 }
-
 
 /* add client to connection queue. At this point some header information
  * has been collected, so we now pass it onto the connection thread for
@@ -1386,7 +1383,7 @@ int connection_setup_sockets (ice_config_t *config)
         allowed_ip.filename = strdup (config->allowfile);
 
     count = 0;
-    global.serversock = calloc (config->listen_sock_count, sizeof (sock_t));
+    global.serversock = acalloc (config->listen_sock_count, sizeof (sock_t));
 
     listener = config->listen_sock;
     prev = &config->listen_sock;

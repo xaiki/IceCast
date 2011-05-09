@@ -80,6 +80,7 @@
 #include "client.h"
 #include "cfgfile.h"
 #include "httpp/httpp.h"
+#include "amalloc.h"
 
 #include "logging.h"
 #define CATMODULE "auth_url"
@@ -228,7 +229,7 @@ static auth_result url_remove_listener (auth_client *auth_user)
             if (client->username && client->password)
             {
                 int len = strlen (client->username) + strlen (client->password) + 2;
-                userpwd = malloc (len);
+                userpwd = amalloc (len);
                 snprintf (userpwd, len, "%s:%s", client->username, client->password);
                 curl_easy_setopt (url->handle, CURLOPT_USERPWD, userpwd);
             }
@@ -316,7 +317,7 @@ static auth_result url_add_listener (auth_client *auth_user)
             if (client->username && client->password)
             {
                 int len = strlen (client->username) + strlen (client->password) + 2;
-                userpwd = malloc (len);
+                userpwd = amalloc (len);
                 snprintf (userpwd, len, "%s:%s", client->username, client->password);
                 curl_easy_setopt (url->handle, CURLOPT_USERPWD, userpwd);
             }
@@ -528,7 +529,7 @@ int auth_get_url_auth (auth_t *authenticator, config_options_t *options)
     authenticator->deleteuser = auth_url_deleteuser;
     authenticator->listuser = auth_url_listuser;
 
-    url_info = calloc(1, sizeof(auth_url));
+    url_info = acalloc(1, sizeof(auth_url));
     authenticator->state = url_info;
 
     /* default headers */
@@ -615,7 +616,7 @@ int auth_get_url_auth (auth_t *authenticator, config_options_t *options)
     if (url_info->username && url_info->password)
     {
         int len = strlen (url_info->username) + strlen (url_info->password) + 2;
-        url_info->userpwd = malloc (len);
+        url_info->userpwd = amalloc (len);
         snprintf (url_info->userpwd, len, "%s:%s", url_info->username, url_info->password);
     }
 

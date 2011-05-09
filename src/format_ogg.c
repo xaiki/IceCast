@@ -44,6 +44,7 @@
 #include "format_flac.h"
 #include "format_kate.h"
 #include "format_skeleton.h"
+#include "amalloc.h"
 
 #ifdef _WIN32
 #define snprintf _snprintf
@@ -160,9 +161,9 @@ static void free_ogg_codecs (ogg_state_t *ogg_info)
 int format_ogg_get_plugin (source_t *source)
 {
     format_plugin_t *plugin;
-    ogg_state_t *state = calloc (1, sizeof (ogg_state_t));
+    ogg_state_t *state = acalloc (1, sizeof (ogg_state_t));
 
-    plugin = (format_plugin_t *)calloc(1, sizeof(format_plugin_t));
+    plugin = (format_plugin_t *)acalloc(1, sizeof(format_plugin_t));
 
     plugin->type = FORMAT_TYPE_OGG;
     plugin->get_buffer = ogg_get_buffer;
@@ -286,13 +287,13 @@ static void update_comments (source_t *source)
         if (title)
         {
             len += strlen(artist) + strlen(title) + 3;
-            metadata = calloc (1, len);
+            metadata = acalloc (1, len);
             snprintf (metadata, len, "%s - %s", artist, title);
         }
         else
         {
             len += strlen(artist);
-            metadata = calloc (1, len);
+            metadata = acalloc (1, len);
             snprintf (metadata, len, "%s", artist);
         }
     }
@@ -301,7 +302,7 @@ static void update_comments (source_t *source)
         if (title)
         {
             len += strlen (title);
-            metadata = calloc (1, len);
+            metadata = acalloc (1, len);
             snprintf (metadata, len, "%s", title);
         }
     }
@@ -455,16 +456,14 @@ static refbuf_t *ogg_get_buffer (source_t *source)
 
 static int create_ogg_client_data (source_t *source, client_t *client) 
 {
-    struct ogg_client *client_data = calloc (1, sizeof (struct ogg_client));
+    struct ogg_client *client_data = acalloc (1, sizeof (struct ogg_client));
     int ret = -1;
 
-    if (client_data)
-    {
         client_data->headers_sent = 1;
         client->format_data = client_data;
         client->free_client_data = free_ogg_client_data;
         ret = 0;
-    }
+
     return ret;
 }
 

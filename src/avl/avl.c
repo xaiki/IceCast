@@ -43,10 +43,9 @@ avl_node_new (void *        key,
           avl_node *    parent)
 {
   avl_node * node = (avl_node *) malloc (sizeof (avl_node));
+  if (!node)
+    abort();
 
-  if (!node) {
-    return NULL;
-  } else {
     node->parent = parent;
     node->key = key;
     node->left = NULL;
@@ -59,22 +58,15 @@ avl_node_new (void *        key,
 #endif
     return node;
   }
-}         
 
 avl_tree *
 avl_tree_new (avl_key_compare_fun_type compare_fun,
           void * compare_arg)
 {
   avl_tree * t = (avl_tree *) malloc (sizeof (avl_tree));
-
-  if (!t) {
-    return NULL;
-  } else {
     avl_node * root = avl_node_new((void *)NULL, (avl_node *) NULL);
-    if (!root) {
-      free (t);
-      return NULL;
-    } else {
+  if (!t)
+    abort();
       t->root = root;
       t->height = 0;
       t->length = 0;
@@ -83,8 +75,6 @@ avl_tree_new (avl_key_compare_fun_type compare_fun,
       thread_rwlock_create(&t->rwlock);
       return t;
     }
-  }
-}
   
 static void
 avl_tree_free_helper (avl_node * node, avl_free_key_fun_type free_key_fun)

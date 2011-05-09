@@ -366,8 +366,10 @@ static int create_log_entry (int log_id, const char *pre, const char *line)
         return fprintf (loglist[log_id].logfile, "%s%s\n", pre, line); 
     
     entry = calloc (1, sizeof (log_entry_t));
+    if (!entry) abort();
     entry->len = strlen (pre) + strlen (line) + 2;
     entry->line = malloc (entry->len);
+    if (!entry->line) abort();
     snprintf (entry->line, entry->len, "%s%s\n", pre, line);
     loglist [log_id].total += entry->len;
     fprintf (loglist[log_id].logfile, "%s", entry->line);
@@ -401,6 +403,7 @@ void log_contents (int log_id, char **_contents, unsigned int *_len)
     _lock_logger ();
     remain = loglist [log_id].total + 1;
     *_contents = malloc (remain);
+    if (!_contents) abort();
     **_contents= '\0';
     *_len = loglist [log_id].total;
 

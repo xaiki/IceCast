@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "refbuf.h"
+#include "amalloc.h"
 
 #define CATMODULE "refbuf"
 
@@ -42,16 +43,11 @@ refbuf_t *refbuf_new (unsigned int size)
 {
     refbuf_t *refbuf;
 
-    refbuf = (refbuf_t *)malloc(sizeof(refbuf_t));
-    if (refbuf == NULL)
-        abort();
+    refbuf = (refbuf_t *)amalloc(sizeof(refbuf_t));
     refbuf->data = NULL;
     if (size)
-    {
-        refbuf->data = malloc (size);
-        if (refbuf->data == NULL)
-            abort();
-    }
+        refbuf->data = amalloc (size);
+
     refbuf->len = size;
     refbuf->sync_point = 0;
     refbuf->_count = 1;

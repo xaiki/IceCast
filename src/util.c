@@ -44,6 +44,7 @@
 #include "refbuf.h"
 #include "connection.h"
 #include "client.h"
+#include "amalloc.h"
 
 #define CATMODULE "util"
 
@@ -58,6 +59,7 @@
  *           0 if no activity occurs
  *         < 0 for error.
  */
+
 int util_timed_wait_for_fd(sock_t fd, int timeout)
 {
 #ifdef HAVE_POLL
@@ -232,8 +234,7 @@ char *util_get_path_from_normalised_uri(const char *uri) {
 
     webroot = config->webroot_dir;
 
-    fullpath = malloc(strlen(uri) + strlen(webroot) + 1);
-    if (fullpath)
+    fullpath = amalloc(strlen(uri) + strlen(webroot) + 1);
         sprintf (fullpath, "%s%s", webroot, uri);
     config_release_config();
 
@@ -267,7 +268,7 @@ char *util_url_escape (const char *src)
 {
     int len = strlen(src);
     /* Efficiency not a big concern here, keep the code simple/conservative */
-    char *dst = calloc(1, len*3 + 1);
+    char *dst = acalloc(1, len*3 + 1);
     unsigned char *source = (unsigned char *)src;
     int i,j=0;
 
@@ -295,7 +296,7 @@ char *util_url_unescape (const char *src)
     char *dst;
     int done = 0;
 
-    decoded = calloc(1, len + 1);
+    decoded = acalloc(1, len + 1);
 
     dst = decoded;
 
@@ -391,7 +392,7 @@ static signed char base64decode[256] = {
 
 char *util_bin_to_hex(unsigned char *data, int len)
 {
-    char *hex = malloc(len*2 + 1);
+    char *hex = amalloc(len*2 + 1);
     int i;
 
     for(i = 0; i < len; i++) {
@@ -408,7 +409,7 @@ char *util_bin_to_hex(unsigned char *data, int len)
 char *util_base64_encode(const char *data)
 {
     int len = strlen(data);
-    char *out = malloc(len*4/3 + 4);
+    char *out = amalloc(len*4/3 + 4);
     char *result = out;
     int chunk;
 
@@ -442,7 +443,7 @@ char *util_base64_decode(const char *data)
 {
     const unsigned char *input = (const unsigned char *)data;
     int len = strlen (data);
-    char *out = malloc(len*3/4 + 5);
+    char *out = amalloc(len*3/4 + 5);
     char *result = out;
     signed char vals[4];
 
@@ -487,7 +488,7 @@ char *util_base64_decode(const char *data)
 
 util_dict *util_dict_new(void)
 {
-    return (util_dict *)calloc(1, sizeof(util_dict));
+    return (util_dict *)acalloc(1, sizeof(util_dict));
 }
 
 void util_dict_free(util_dict *dict)
@@ -536,10 +537,6 @@ int util_dict_set(util_dict *dict, const char *key, const char *val)
 
     if (!dict) {
         dict = util_dict_new();
-        if (!dict) {
-            ERROR0("unable to allocate new dictionary");
-            return 0;
-        }
         if (prev)
             prev->next = dict;
     }
@@ -579,9 +576,7 @@ char *util_dict_urlencode(util_dict *dict, char delim)
         if (!dict->key)
             continue;
         if (start) {
-            if (!(res = malloc(strlen(dict->key) + 1))) {
-                return NULL;
-            }
+            res = amalloc(strlen(dict->key) + 1);
             sprintf(res, "%s", dict->key);
             start = 0;
         } else {
@@ -596,10 +591,7 @@ char *util_dict_urlencode(util_dict *dict, char delim)
         /* encode value */
         if (!dict->val)
             continue;
-        if (!(enc = util_url_escape(dict->val))) {
-            free(res);
-            return NULL;
-        }
+        enc = util_url_escape(dict->val);
 
         if (!(tmp = realloc(res, strlen(res) + strlen(enc) + 2))) {
             free(enc);

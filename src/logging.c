@@ -82,7 +82,7 @@ int get_clf_time (char *buffer, unsigned len, struct tm *t)
         sign = '+';
     }
 
-    timezone_string = calloc(1, 7);
+    timezone_string = acalloc(1, 7);
     snprintf(timezone_string, 7, " %c%.2d%.2d", sign, time_tz / 60, time_tz % 60);
 
     now = time(NULL);

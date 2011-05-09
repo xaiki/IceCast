@@ -33,6 +33,7 @@
 #include "httpp/httpp.h"
 #include "fserve.h"
 #include "admin.h"
+#include "amalloc.h"
 
 #include "logging.h"
 #define CATMODULE "auth"
@@ -83,7 +84,7 @@ static auth_client *auth_client_setup (const char *mount, client_t *client)
 
     } while (0);
 
-    auth_user = calloc (1, sizeof(auth_client));
+    auth_user = acalloc (1, sizeof(auth_client));
     auth_user->mount = strdup (mount);
     auth_user->client = client;
     return auth_user;
@@ -635,7 +636,7 @@ static int get_authenticator (auth_t *auth, config_options_t *options)
 
 auth_t *auth_get_authenticator (xmlNodePtr node)
 {
-    auth_t *auth = calloc (1, sizeof (auth_t));
+    auth_t *auth = acalloc (1, sizeof (auth_t));
     config_options_t *options = NULL, **next_option = &options;
     xmlNodePtr option;
 
@@ -649,7 +650,7 @@ auth_t *auth_get_authenticator (xmlNodePtr node)
         option = option->next;
         if (xmlStrcmp (current->name, XMLSTR("option")) == 0)
         {
-            config_options_t *opt = calloc (1, sizeof (config_options_t));
+            config_options_t *opt = acalloc (1, sizeof (config_options_t));
             opt->name = (char *)xmlGetProp (current, XMLSTR("name"));
             if (opt->name == NULL)
             {
@@ -724,16 +725,13 @@ void auth_stream_start (mount_proxy *mountinfo, const char *mount)
 {
     if (mountinfo && mountinfo->auth && mountinfo->auth->stream_start)
     {
-        auth_client *auth_user = calloc (1, sizeof (auth_client));
-        if (auth_user)
-        {
+        auth_client *auth_user = acalloc (1, sizeof (auth_client));
             auth_user->mount = strdup (mount);
             auth_user->process = stream_start_callback;
 
             queue_auth_client (auth_user, mountinfo);
         }
     }
-}
 
 
 /* Called when the stream ends so that the authentication engine can do
@@ -743,16 +741,13 @@ void auth_stream_end (mount_proxy *mountinfo, const char *mount)
 {
     if (mountinfo && mountinfo->auth && mountinfo->auth->stream_end)
     {
-        auth_client *auth_user = calloc (1, sizeof (auth_client));
-        if (auth_user)
-        {
+	    auth_client *auth_user = acalloc (1, sizeof (auth_client));
             auth_user->mount = strdup (mount);
             auth_user->process = stream_end_callback;
 
             queue_auth_client (auth_user, mountinfo);
         }
     }
-}
 
 
 /* these are called at server start and termination */
