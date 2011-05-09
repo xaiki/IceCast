@@ -25,6 +25,7 @@
 #include "refbuf.h"
 #include "client.h"
 #include "logging.h" 
+#include "amalloc.h"
 
 #define CATMODULE "CONFIG"
 #define CONFIG_DEFAULT_LOCATION "Earth"
@@ -381,12 +382,12 @@ static void _set_defaults(ice_config_t *configuration)
     configuration->burst_size = CONFIG_DEFAULT_BURST_SIZE;
 }
 
-static void _parse_root(xmlDocPtr doc, xmlNodePtr node, 
+static void _parse_root(xmlDocPtr doc, xmlNodePtr node,
         ice_config_t *configuration)
 {
     char *tmp;
 
-    configuration->listen_sock = calloc (1, sizeof (*configuration->listen_sock));
+    configuration->listen_sock = acalloc (1, sizeof (*configuration->listen_sock));
     configuration->listen_sock->port = 8000;
     configuration->listen_sock_count = 1;
 
@@ -543,14 +544,14 @@ static void _parse_limits(xmlDocPtr doc, xmlNodePtr node,
     } while ((node = node->next));
 }
 
-static void _parse_mount(xmlDocPtr doc, xmlNodePtr node, 
+static void _parse_mount(xmlDocPtr doc, xmlNodePtr node,
         ice_config_t *configuration)
 {
     char *tmp;
-    mount_proxy *mount = calloc(1, sizeof(mount_proxy));
+    mount_proxy *mount = acalloc(1, sizeof(mount_proxy));
     mount_proxy *current = configuration->mounts;
     mount_proxy *last=NULL;
-    
+
     /* default <mount> settings */
     mount->max_listeners = -1;
     mount->burst_size = -1;
@@ -711,7 +712,7 @@ static void _parse_relay(xmlDocPtr doc, xmlNodePtr node,
         ice_config_t *configuration)
 {
     char *tmp;
-    relay_server *relay = calloc(1, sizeof(relay_server));
+    relay_server *relay = acalloc(1, sizeof(relay_server));
     relay_server *current = configuration->relay;
     relay_server *last=NULL;
 
@@ -788,7 +789,7 @@ static void _parse_listen_socket(xmlDocPtr doc, xmlNodePtr node,
         ice_config_t *configuration)
 {
     char *tmp;
-    listener_t *listener = calloc (1, sizeof(listener_t));
+    listener_t *listener = acalloc (1, sizeof(listener_t));
 
     if (listener == NULL)
         return;
@@ -839,7 +840,7 @@ static void _parse_listen_socket(xmlDocPtr doc, xmlNodePtr node,
     configuration->listen_sock_count++;
     if (listener->shoutcast_mount)
     {
-        listener_t *sc_port = calloc (1, sizeof (listener_t));
+        listener_t *sc_port = acalloc (1, sizeof (listener_t));
         sc_port->port = listener->port+1;
         sc_port->shoutcast_compat = 1;
         sc_port->shoutcast_mount = (char*)xmlStrdup (XMLSTR(listener->shoutcast_mount));
@@ -966,13 +967,13 @@ static void _parse_paths(xmlDocPtr doc, xmlNodePtr node,
             if(configuration->webroot_dir[strlen(configuration->webroot_dir)-1] == '/')
                 configuration->webroot_dir[strlen(configuration->webroot_dir)-1] = 0;
         } else if (xmlStrcmp (node->name, XMLSTR("adminroot")) == 0) {
-            if (configuration->adminroot_dir) 
+            if (configuration->adminroot_dir)
                 xmlFree(configuration->adminroot_dir);
             configuration->adminroot_dir = (char *)xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
             if(configuration->adminroot_dir[strlen(configuration->adminroot_dir)-1] == '/')
                 configuration->adminroot_dir[strlen(configuration->adminroot_dir)-1] = 0;
         } else if (xmlStrcmp (node->name, XMLSTR("alias")) == 0) {
-            alias = malloc(sizeof(aliases));
+            alias = amalloc(sizeof(aliases));
             alias->next = NULL;
             alias->source = (char *)xmlGetProp(node, XMLSTR("source"));
             if(alias->source == NULL) {

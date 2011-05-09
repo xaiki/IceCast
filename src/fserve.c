@@ -58,6 +58,7 @@
 #include "util.h"
 #include "admin.h"
 #include "compat.h"
+#include "amalloc.h"
 
 #include "fserve.h"
 
@@ -643,14 +644,9 @@ static void fserve_add_pending (fserve_t *fclient)
  */
 int fserve_add_client (client_t *client, FILE *file)
 {
-    fserve_t *fclient = calloc (1, sizeof(fserve_t));
+    fserve_t *fclient = acalloc (1, sizeof(fserve_t));
 
     DEBUG1 ("Adding client %p to file serving engine", client);
-    if (fclient == NULL)
-    {
-        client_send_404 (client, "memory exhausted");
-        return -1;
-    }
     fclient->file = file;
     fclient->client = client;
     fclient->ready = 0;
@@ -750,7 +746,7 @@ void fserve_recheck_mime_types (ice_config_t *config)
             {
                 void *tmp;
                 /* Add a new extension->type mapping */
-                mapping = malloc(sizeof(mime_type));
+                mapping = amalloc(sizeof(mime_type));
                 mapping->ext = strdup(ext);
                 mapping->type = strdup(type);
                 if (!avl_get_by_key (new_mimetypes, mapping, &tmp))

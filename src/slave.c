@@ -55,6 +55,7 @@
 #include "source.h"
 #include "format.h"
 #include "event.h"
+#include "amalloc.h"
 
 #define CATMODULE "slave"
 
@@ -85,21 +86,19 @@ relay_server *relay_free (relay_server *relay)
 
 relay_server *relay_copy (relay_server *r)
 {
-    relay_server *copy = calloc (1, sizeof (relay_server));
+    relay_server *copy = acalloc (1, sizeof (relay_server));
 
-    if (copy)
-    {
-        copy->server = (char *)xmlCharStrdup (r->server);
-        copy->mount = (char *)xmlCharStrdup (r->mount);
-        copy->localmount = (char *)xmlCharStrdup (r->localmount);
-        if (r->username)
-            copy->username = (char *)xmlCharStrdup (r->username);
-        if (r->password)
-            copy->password = (char *)xmlCharStrdup (r->password);
-        copy->port = r->port;
-        copy->mp3metadata = r->mp3metadata;
-        copy->on_demand = r->on_demand;
-    }
+    copy->server = (char *)xmlCharStrdup (r->server);
+    copy->mount = (char *)xmlCharStrdup (r->mount);
+    copy->localmount = (char *)xmlCharStrdup (r->localmount);
+    if (r->username)
+        copy->username = (char *)xmlCharStrdup (r->username);
+    if (r->password)
+        copy->password = (char *)xmlCharStrdup (r->password);
+    copy->port = r->port;
+    copy->mp3metadata = r->mp3metadata;
+    copy->on_demand = r->on_demand;
+
     return copy;
 }
 
@@ -171,12 +170,12 @@ static client_t *open_relay_connection (relay_server *relay)
         char *esc_authorisation;
         unsigned len = strlen(relay->username) + strlen(relay->password) + 2;
 
-        auth_header = malloc (len);
+        auth_header = amalloc (len);
         snprintf (auth_header, len, "%s:%s", relay->username, relay->password);
         esc_authorisation = util_base64_encode(auth_header);
         free(auth_header);
         len = strlen (esc_authorisation) + 24;
-        auth_header = malloc (len);
+        auth_header = amalloc (len);
         snprintf (auth_header, len,
                 "Authorization: Basic %s\r\n", esc_authorisation);
         free(esc_authorisation);
@@ -256,7 +255,7 @@ static client_t *open_relay_connection (relay_server *relay)
             if (uri [len] == ':')
                 port = atoi (uri+len+1);
             free (server);
-            server = calloc (1, len+1);
+            server = acalloc (1, len+1);
             strncpy (server, uri, len);
             connection_close (con);
             httpp_destroy (parser);
@@ -640,7 +639,7 @@ static int update_from_master(ice_config_t *config)
         }
 
         len = strlen(username) + strlen(password) + 2;
-        authheader = malloc(len);
+        authheader = amalloc(len);
         snprintf (authheader, len, "%s:%s", username, password);
         data = util_base64_encode(authheader);
         sock_write (mastersock,
@@ -669,18 +668,15 @@ static int update_from_master(ice_config_t *config)
             if (!strlen(buf))
                 continue;
             DEBUG2 ("read %d from master \"%s\"", count++, buf);
-            r = calloc (1, sizeof (relay_server));
-            if (r)
-            {
-                r->server = (char *)xmlCharStrdup (master);
-                r->port = port;
-                r->mount = (char *)xmlCharStrdup (buf);
-                r->localmount = (char *)xmlCharStrdup (buf);
-                r->mp3metadata = 1;
-                r->on_demand = on_demand;
-                r->next = new_relays;
-                new_relays = r;
-            }
+            r = acalloc (1, sizeof (relay_server));
+            r->server = (char *)xmlCharStrdup (master);
+            r->port = port;
+            r->mount = (char *)xmlCharStrdup (buf);
+            r->localmount = (char *)xmlCharStrdup (buf);
+            r->mp3metadata = 1;
+            r->on_demand = on_demand;
+            r->next = new_relays;
+            new_relays = r;
         }
         sock_close (mastersock);
 

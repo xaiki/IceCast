@@ -20,7 +20,10 @@
 #endif
 
 #include <avl/avl.h>
+#include <amalloc.h>
+
 #include "httpp.h"
+
 
 #if defined(_WIN32) && !defined(HAVE_STRCASECMP)
 #define strcasecmp stricmp
@@ -39,7 +42,7 @@ static int _free_vars(void *key);
 
 http_parser_t *httpp_create_parser(void)
 {
-    return (http_parser_t *)malloc(sizeof(http_parser_t));
+    return (http_parser_t *)amalloc(sizeof(http_parser_t));
 }
 
 void httpp_initialize(http_parser_t *parser, http_varlist_t *defaults)
@@ -135,13 +138,12 @@ int httpp_parse_response(http_parser_t *parser, const char *http_data, unsigned 
     char *line[MAX_HEADERS];
     int lines, slen,i, whitespace=0, where=0,code;
     char *version=NULL, *resp_code=NULL, *message=NULL;
-    
+
     if(http_data == NULL)
         return 0;
 
     /* make a local copy of the data, including 0 terminator */
-    data = (char *)malloc(len+1);
-    if (data == NULL) return 0;
+    data = (char *)amalloc(len+1);
     memcpy(data, http_data, len);
     data[len] = 0;
 
@@ -209,7 +211,7 @@ static char *url_escape(const char *src)
     char *dst;
     int done = 0;
 
-    decoded = calloc(1, len + 1);
+    decoded = acalloc(1, len + 1);
 
     dst = (char *)decoded;
 
@@ -300,8 +302,7 @@ int httpp_parse(http_parser_t *parser, const char *http_data, unsigned long len)
         return 0;
 
     /* make a local copy of the data, including 0 terminator */
-    data = (char *)malloc(len+1);
-    if (data == NULL) return 0;
+    data = (char *)amalloc(len+1);
     memcpy(data, http_data, len);
     data[len] = 0;
 
@@ -444,8 +445,7 @@ void httpp_setvar(http_parser_t *parser, const char *name, const char *value)
     if (name == NULL || value == NULL)
         return;
 
-    var = (http_var_t *)malloc(sizeof(http_var_t));
-    if (var == NULL) return;
+    var = (http_var_t *)amalloc(sizeof(http_var_t));
 
     var->name = strdup(name);
     var->value = strdup(value);
@@ -484,8 +484,7 @@ void httpp_set_query_param(http_parser_t *parser, const char *name, const char *
     if (name == NULL || value == NULL)
         return;
 
-    var = (http_var_t *)malloc(sizeof(http_var_t));
-    if (var == NULL) return;
+    var = (http_var_t *)amalloc(sizeof(http_var_t));
 
     var->name = strdup(name);
     var->value = url_escape(value);

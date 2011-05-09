@@ -34,6 +34,7 @@
 #include "xslt.h"
 #include "fserve.h"
 #include "admin.h"
+#include "amalloc.h"
 
 #include "format.h"
 
@@ -290,7 +291,7 @@ void admin_send_response (xmlDocPtr doc, client_t *client,
 
         fullpath_xslt_template_len = strlen (config->adminroot_dir) + 
             strlen (xslt_template) + 2;
-        fullpath_xslt_template = malloc(fullpath_xslt_template_len);
+        fullpath_xslt_template = amalloc(fullpath_xslt_template_len);
         snprintf(fullpath_xslt_template, fullpath_xslt_template_len, "%s%s%s",
             config->adminroot_dir, PATH_SEPARATOR, xslt_template);
         config_release_config();

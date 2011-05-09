@@ -30,6 +30,7 @@
 #include "format_ogg.h"
 #include "stats.h"
 #include "format.h"
+#include "amalloc.h"
 
 #define CATMODULE "format-vorbis"
 #include "logging.h"
@@ -105,22 +106,13 @@ static void vorbis_codec_free (ogg_state_t *ogg_info, ogg_codec_t *codec)
 static ogg_packet *copy_ogg_packet (ogg_packet *packet)
 {
     ogg_packet *next;
-    do
-    {
-        next = malloc (sizeof (ogg_packet));
-        if (next == NULL)
-            break;
-        memcpy (next, packet, sizeof (ogg_packet));
-        next->packet = malloc (next->bytes);
-        if (next->packet == NULL)
-            break;
-        memcpy (next->packet, packet->packet, next->bytes);
-        return next;
-    } while (0);
 
-    if (next)
-        free (next);
-    return NULL;
+    next = amalloc (sizeof (ogg_packet));
+    memcpy (next, packet, sizeof (ogg_packet));
+    next->packet = amalloc (next->bytes);
+    memcpy (next->packet, packet->packet, next->bytes);
+
+    return next;
 }
 
 
@@ -360,10 +352,10 @@ static int process_vorbis_headers (ogg_state_t *ogg_info, ogg_codec_t *codec)
  */
 ogg_codec_t *initial_vorbis_page (format_plugin_t *plugin, ogg_page *page)
 {
-    ogg_codec_t *codec = calloc (1, sizeof (ogg_codec_t));
+    ogg_codec_t *codec = acalloc (1, sizeof (ogg_codec_t));
     ogg_packet packet;
 
-    vorbis_codec_t *vorbis = calloc (1, sizeof (vorbis_codec_t));
+    vorbis_codec_t *vorbis = acalloc (1, sizeof (vorbis_codec_t));
 
     ogg_stream_init (&codec->os, ogg_page_serialno (page));
     ogg_stream_pagein (&codec->os, page);
@@ -400,8 +392,8 @@ ogg_codec_t *initial_vorbis_page (format_plugin_t *plugin, ogg_page *page)
     codec->process = process_vorbis;
     plugin->set_tag = vorbis_set_tag;
 
-    vorbis->bos_page.header = malloc (page->header_len + page->body_len);
-    
+    vorbis->bos_page.header = amalloc (page->header_len + page->body_len);
+
     memcpy (vorbis->bos_page.header, page->header, page->header_len);
     vorbis->bos_page.header_len = page->header_len;
 

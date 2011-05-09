@@ -28,6 +28,7 @@ typedef struct source_tag source_t;
 #include "format_theora.h"
 #include "client.h"
 #include "stats.h"
+#include "amalloc.h"
 
 #define CATMODULE "format-theora"
 #include "logging.h"
@@ -149,10 +150,10 @@ static refbuf_t *process_theora_page (ogg_state_t *ogg_info, ogg_codec_t *codec,
 ogg_codec_t *initial_theora_page (format_plugin_t *plugin, ogg_page *page)
 {
     ogg_state_t *ogg_info = plugin->_state;
-    ogg_codec_t *codec = calloc (1, sizeof (ogg_codec_t));
+    ogg_codec_t *codec = acalloc (1, sizeof (ogg_codec_t));
     ogg_packet packet;
 
-    theora_codec_t *theora_codec = calloc (1, sizeof (theora_codec_t));
+    theora_codec_t *theora_codec = acalloc (1, sizeof (theora_codec_t));
 
     ogg_stream_init (&codec->os, ogg_page_serialno (page));
     ogg_stream_pagein (&codec->os, page);

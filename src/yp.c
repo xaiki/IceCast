@@ -30,6 +30,7 @@
 #include "source.h"
 #include "cfgfile.h"
 #include "stats.h"
+#include "amalloc.h"
 
 #ifdef WIN32
 #define snprintf _snprintf
@@ -116,9 +117,8 @@ static int handle_returned_header (void *ptr, size_t size, size_t nmemb, void *s
     {
         unsigned len = bytes - 11;
         free (yp->error_msg);
-        yp->error_msg = calloc (1, len);
-        if (yp->error_msg)
-            sscanf (ptr, "YPMessage: %[^\r\n]", yp->error_msg);
+        yp->error_msg = acalloc (1, len);
+	sscanf (ptr, "YPMessage: %[^\r\n]", yp->error_msg);
     }
 
     if (yp->process == do_yp_add)
@@ -127,9 +127,8 @@ static int handle_returned_header (void *ptr, size_t size, size_t nmemb, void *s
         {
             unsigned len = bytes - 5;
             free (yp->sid);
-            yp->sid = calloc (1, len);
-            if (yp->sid)
-                sscanf (ptr, "SID: %[^\r\n]", yp->sid);
+            yp->sid = acalloc (1, len);
+	    sscanf (ptr, "SID: %[^\r\n]", yp->sid);
         }
     }
     if (strncmp (ptr, "TouchFreq: ", 11) == 0)
@@ -229,13 +228,8 @@ void yp_recheck_config (ice_config_t *config)
         server = find_yp_server (config->yp_url[i]);
         if (server == NULL)
         {
-            server = calloc (1, sizeof (struct yp_server));
+            server = acalloc (1, sizeof (struct yp_server));
 
-            if (server == NULL)
-            {
-                destroy_yp_server (server);
-                break;
-            }
             server->server_id = strdup ((char *)server_version);
             server->url = strdup (config->yp_url[i]);
             server->url_timeout = config->yp_url_timeout[i];
@@ -441,14 +435,11 @@ static int do_yp_touch (ypdata_t *yp, char *s, unsigned len)
              separator = "";
          }
          if (title == NULL) title = strdup("");
-         song = malloc (strlen (artist) + strlen (title) + strlen (separator) +1);
-         if (song)
-         {
-             sprintf (song, "%s%s%s", artist, separator, title);
-             add_yp_info(yp, song, YP_CURRENT_SONG);
-             stats_event (yp->mount, "yp_currently_playing", song);
-             free (song);
-         }
+         song = amalloc (strlen (artist) + strlen (title) + strlen (separator) +1);
+	 sprintf (song, "%s%s%s", artist, separator, title);
+	 add_yp_info(yp, song, YP_CURRENT_SONG);
+	 stats_event (yp->mount, "yp_currently_playing", song);
+	 free (song);
     }
     free (artist);
     free (title);
@@ -556,7 +547,7 @@ static ypdata_t *create_yp_entry (const char *mount)
     ypdata_t *yp;
     char *s;
 
-    yp = calloc (1, sizeof (ypdata_t));
+    yp = acalloc (1, sizeof (ypdata_t));
     do
     {
         unsigned len = 512;

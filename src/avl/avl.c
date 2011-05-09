@@ -43,49 +43,39 @@ avl_node_new (void *        key,
           avl_node *    parent)
 {
   avl_node * node = (avl_node *) malloc (sizeof (avl_node));
+  if (!node)
+    abort();
 
-  if (!node) {
-    return NULL;
-  } else {
-    node->parent = parent;
-    node->key = key;
-    node->left = NULL;
-    node->right = NULL;
-    node->rank_and_balance = 0;
-    AVL_SET_BALANCE (node, 0);
-    AVL_SET_RANK (node, 1);
+  node->parent = parent;
+  node->key = key;
+  node->left = NULL;
+  node->right = NULL;
+  node->rank_and_balance = 0;
+  AVL_SET_BALANCE (node, 0);
+  AVL_SET_RANK (node, 1);
 #ifdef HAVE_AVL_NODE_LOCK
-    thread_rwlock_create(&node->rwlock);
+  thread_rwlock_create(&node->rwlock);
 #endif
-    return node;
-  }
-}         
+  return node;
+}
 
 avl_tree *
 avl_tree_new (avl_key_compare_fun_type compare_fun,
           void * compare_arg)
 {
   avl_tree * t = (avl_tree *) malloc (sizeof (avl_tree));
-
-  if (!t) {
-    return NULL;
-  } else {
-    avl_node * root = avl_node_new((void *)NULL, (avl_node *) NULL);
-    if (!root) {
-      free (t);
-      return NULL;
-    } else {
-      t->root = root;
-      t->height = 0;
-      t->length = 0;
-      t->compare_fun = compare_fun;
-      t->compare_arg = compare_arg;
-      thread_rwlock_create(&t->rwlock);
-      return t;
-    }
-  }
+  avl_node * root = avl_node_new((void *)NULL, (avl_node *) NULL);
+  if (!t)
+    abort();
+  t->root = root;
+  t->height = 0;
+  t->length = 0;
+  t->compare_fun = compare_fun;
+  t->compare_arg = compare_arg;
+  thread_rwlock_create(&t->rwlock);
+  return t;
 }
-  
+
 static void
 avl_tree_free_helper (avl_node * node, avl_free_key_fun_type free_key_fun)
 {

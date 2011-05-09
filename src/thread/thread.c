@@ -46,6 +46,8 @@
 #include <log/log.h>
 #endif
 
+#include <amalloc.h>
+
 #ifdef _WIN32
 #define __FUNCTION__ __FILE__
 #endif
@@ -168,7 +170,7 @@ void thread_initialize(void)
 
     _threadtree = avl_tree_new(_compare_threads, NULL);
 
-    thread = (thread_type *)malloc(sizeof(thread_type));
+    thread = (thread_type *)amalloc(sizeof(thread_type));
 
     thread->thread_id = _next_thread_id++;
     thread->line = 0;
@@ -269,13 +271,9 @@ thread_type *thread_create_c(char *name, void *(*start_routine)(void *),
     thread_start_t *start = NULL;
     pthread_attr_t attr;
 
-    thread = (thread_type *)calloc(1, sizeof(thread_type));
+    thread = (thread_type *)acalloc(1, sizeof(thread_type));
     do {
-        if (thread == NULL)
-            break;
-        start = (thread_start_t *)calloc(1, sizeof(thread_start_t));
-        if (start == NULL)
-            break;
+        start = (thread_start_t *)acalloc(1, sizeof(thread_start_t));
         if (pthread_attr_init (&attr) < 0)
             break;
 
@@ -501,9 +499,7 @@ void thread_cond_init(cond_t *cond)
 
 cond_t *thread_cond_create(void)
 {
-    cond_t *cond = calloc (1, sizeof(cond_t));
-    if (!cond)
-        return;
+    cond_t *cond = acalloc (1, sizeof(cond_t));
 
     thread_cond_init(cond);
 

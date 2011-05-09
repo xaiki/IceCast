@@ -34,6 +34,7 @@
 #include "stats.h"
 #include "fserve.h"
 #include "util.h"
+#include "amalloc.h"
 
 #include "client.h"
 #include "logging.h"
@@ -53,12 +54,9 @@
 int client_create (client_t **c_ptr, connection_t *con, http_parser_t *parser)
 {
     ice_config_t *config;
-    client_t *client = (client_t *)calloc(1, sizeof(client_t));
+    client_t *client = (client_t *)acalloc(1, sizeof(client_t));
     const char *transferenc;
     int ret = 0;
-
-    if (client == NULL)
-        abort();
 
     transferenc = httpp_getvar (parser, "transfer-encoding");
 

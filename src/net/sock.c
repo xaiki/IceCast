@@ -60,6 +60,7 @@
 
 #include "sock.h"
 #include "resolver.h"
+#include "amalloc.h"
 
 /* for older C libraries */
 #ifndef AI_NUMERICSERV
@@ -436,14 +437,11 @@ int sock_write_fmt(sock_t sock, const char *fmt, va_list ap)
         else
         {
             /* truncated */
-            buff = malloc (++len);
-            if (buff)
-            {
-                len = vsnprintf (buff, len, fmt, ap_retry);
-                if (len > 0)
-                    rc = sock_write_bytes (sock, buff, len);
-                free (buff);
-            }
+            buff = amalloc (++len);
+	    len = vsnprintf (buff, len, fmt, ap_retry);
+	    if (len > 0)
+		rc = sock_write_bytes (sock, buff, len);
+	    free (buff);
         }
     }
     va_end (ap_retry);
